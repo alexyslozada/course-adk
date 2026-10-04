@@ -42,7 +42,7 @@ func main() {
 	// El coordinador decide a quién delegar leyendo la Description de cada
 	// sub-agente, por eso debe ser clara.
 	// ----------------------------------------------
-	barista, err := llmagent.New(llmagent.Config{
+	baristaConfig := llmagent.Config{
 		Name:        "barista",
 		Model:       model,
 		Description: "Toma los pedidos de bebidas y recomienda cafés.",
@@ -50,7 +50,8 @@ func main() {
 			Eres el barista de una cafetería. Ayuda al cliente a elegir y pedir
 			su bebida. Cuando el pedido esté listo, confírmalo.
 		`,
-	})
+	}
+	barista, err := llmagent.New(baristaConfig)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
@@ -59,7 +60,7 @@ func main() {
 	// ----------------------------------------------
 	// Sub-agente: atención de reseñas
 	// ----------------------------------------------
-	reviewAgent, err := llmagent.New(llmagent.Config{
+	reviewAgentConfig := llmagent.Config{
 		Name:        "review_agent",
 		Model:       model,
 		Description: "Atiende las opiniones, quejas y felicitaciones de los clientes.",
@@ -68,7 +69,8 @@ func main() {
 			opinión del cliente, agradécele y, si es una queja, discúlpate y
 			ofrécele una solución.
 		`,
-	})
+	}
+	reviewAgent, err := llmagent.New(reviewAgentConfig)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
@@ -79,7 +81,7 @@ func main() {
 	// Con SubAgents, el ADK le agrega la tool transfer_to_agent y el LLM
 	// decide a qué sub-agente pasarle la conversación.
 	// ----------------------------------------------
-	coordinator, err := llmagent.New(llmagent.Config{
+	coordinatorConfig := llmagent.Config{
 		Name:        "coffee_host",
 		Model:       model,
 		Description: "Recibe a los clientes de la cafetería y los dirige al área correcta.",
@@ -94,7 +96,8 @@ func main() {
 			barista,
 			reviewAgent,
 		},
-	})
+	}
+	coordinator, err := llmagent.New(coordinatorConfig)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
