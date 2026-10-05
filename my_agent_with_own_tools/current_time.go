@@ -27,12 +27,12 @@ var cityZones = map[string]string{
 func CurrentTime(ctx agent.Context, req CurrentTimeRequest) (CurrentTimeResponse, error) {
 	zone, isFound := cityZones[strings.ToLower(req.City)]
 	if !isFound {
-		return CurrentTimeResponse{}, fmt.Errorf("No conozco la zona horaria de: %s", req.City)
+		return CurrentTimeResponse{}, fmt.Errorf("no conozco la zona horaria de: %s", req.City)
 	}
 
 	loc, err := time.LoadLocation(zone)
 	if err != nil {
-		return CurrentTimeResponse{}, fmt.Errorf("No pude generar la zona horaria de %s", req.City)
+		return CurrentTimeResponse{}, fmt.Errorf("no pude generar la zona horaria de %s", req.City)
 	}
 
 	return CurrentTimeResponse{

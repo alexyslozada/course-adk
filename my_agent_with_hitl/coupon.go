@@ -38,12 +38,12 @@ const confirmationThreshold = 20
 func ApplyCoupon(ctx agent.Context, req ApplyCouponRequest) (ApplyCouponResponse, error) {
 	price, isFound := products[strings.ToLower(req.Product)]
 	if !isFound {
-		return ApplyCouponResponse{}, fmt.Errorf("No existe el producto: %s", req.Product)
+		return ApplyCouponResponse{}, fmt.Errorf("no existe el producto: %s", req.Product)
 	}
 
 	discount, isFound := coupons[strings.ToUpper(req.Coupon)]
 	if !isFound {
-		return ApplyCouponResponse{}, fmt.Errorf("El cupón %s no es válido", req.Coupon)
+		return ApplyCouponResponse{}, fmt.Errorf("el cupón %s no es válido", req.Coupon)
 	}
 
 	return ApplyCouponResponse{

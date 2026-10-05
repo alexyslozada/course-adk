@@ -48,7 +48,7 @@ func (r *codeReceiver) handleCallback(w http.ResponseWriter, req *http.Request) 
 
 	var cb callbackResult
 	if errCode := query.Get("error"); errCode != "" {
-		cb.err = fmt.Errorf("Atlassian rechazó la autorización: %s", errCode)
+		cb.err = fmt.Errorf("la autorización fue rechazada por Atlassian: %s", errCode)
 	} else {
 		cb.result = &auth.AuthorizationResult{
 			Code:  query.Get("code"),
