@@ -89,8 +89,10 @@ El flujo funciona igual. Para la clase, usa el diagrama mermaid del inicio de es
 
 ```bash
 export GOOGLE_API_KEY=...
-go run . web api webui
+go run . web api -include_debug_api webui
 ```
+
+> Desde ADK v2.5.0, el grafo y las trazas de la UI necesitan `-include_debug_api`. La UI queda en http://localhost:8080/ui/.
 
 1. "Latte de avena con jarabe de vainilla y canela" → tres análisis y luego la ficha completa.
 2. Repite con "Frappé de chocolate con crema batida y maní" → observa si las tres respuestas llegan en otro orden.

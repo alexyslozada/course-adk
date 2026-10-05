@@ -61,8 +61,10 @@ Los colores sí indican algo: en verde, los agentes que participaron en el event
 
 ```bash
 export GOOGLE_API_KEY=...
-go run . web api webui
+go run . web api -include_debug_api webui
 ```
+
+> Desde ADK v2.5.0, el grafo y las trazas de la UI necesitan `-include_debug_api`. La UI queda en http://localhost:8080/ui/.
 
 1. "Hola, quiero un capuchino" → responde el **barista**.
 2. "Por cierto, ayer el pan estaba duro" → el barista transfiere al **review_agent**.

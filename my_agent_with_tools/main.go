@@ -9,7 +9,6 @@ import (
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
-	"google.golang.org/adk/v2/integration/slack"
 	"google.golang.org/adk/v2/model/gemini"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/geminitool"
@@ -54,31 +53,6 @@ func main() {
 	}
 
 	a, err := llmagent.New(agentConfig)
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-
-	// ----------------------------------------------
-	// Configuración de la integración con Slack
-	// ----------------------------------------------
-	slackToken := os.Getenv("SLACK_BOT_TOKEN")
-	if slackToken == "" {
-		fmt.Println("Debes configurar SLACK_BOT_TOKEN")
-		os.Exit(1)
-	}
-
-	slackConfig := slack.Config{
-		Token: slackToken,
-	}
-
-	slackIntegration, err := slack.New(slackConfig)
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-
-	err = a.AddIntegration(slackIntegration)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)

@@ -91,8 +91,10 @@ El generador de grafos de la UI solo dibuja líneas de **agente → tool**. Como
 
 ```bash
 export GOOGLE_API_KEY=...
-go run . web api webui
+go run . web api -include_debug_api webui
 ```
+
+> Desde ADK v2.5.0, el grafo y las trazas de la UI necesitan `-include_debug_api`. La UI queda en http://localhost:8080/ui/.
 
 1. "Quiero unirme al club" → `loyalty_signup` pregunta los datos y, al terminar, `coffee_host` te da la bienvenida por tu nombre.
 2. "El croissant estaba delicioso" → `coffee_host` llama a `review_classifier`, recibe el JSON y responde él mismo.

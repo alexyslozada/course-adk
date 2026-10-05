@@ -137,8 +137,10 @@ El generador de grafos del ADK Go dibuja el `sequentialagent` como un recuadro y
 
 ```bash
 export GOOGLE_API_KEY=...
-go run . web api webui
+go run . web api -include_debug_api webui
 ```
+
+> Desde ADK v2.5.0, el grafo y las trazas de la UI necesitan `-include_debug_api`. La UI queda en http://localhost:8080/ui/.
 
 1. En la UI, adjunta `factura_proveedor.pdf` con el clip y escribe "Procesa esta factura".
 2. Verás tres respuestas en orden: el JSON con los 11 ítems (`invoice_reader`), el JSON agrupado (`item_categorizer`) y la tabla final (`report_writer`).
