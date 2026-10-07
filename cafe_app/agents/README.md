@@ -1,9 +1,10 @@
-# cafe_app/agents — coordinador, barista y administrador (fases 3 y 4)
+# cafe_app/agents — coordinador, barista, administrador y analista (fases 3 a 5)
 
-El sistema de agentes de la cafetería (ADK). El **coordinador** recibe al usuario y **delega** en dos sub-agentes, ambos en `ModeTask`:
+El sistema de agentes de la cafetería (ADK). El **coordinador** recibe al usuario y **delega** en dos sub-agentes en `ModeTask` y en un pipeline de análisis:
 
 - el **barista** (fase 3) toma el pedido y lo registra por **MCP**;
-- el **administrador** (fase 4) consulta y ajusta el inventario y aplica descuentos con **tools Go**, pidiendo la confirmación de una persona.
+- el **administrador** (fase 4) consulta y ajusta el inventario y aplica descuentos con **tools Go**, pidiendo la confirmación de una persona;
+- el **analista** (fase 5) arma el reporte del día con un workflow **paralelo + secuencial**.
 
 ```mermaid
 graph TD
@@ -17,6 +18,11 @@ graph TD
     AD <-. "pide aprobación" .-> U
     AD -- "tools Go" --> APP
     AD -- "finish_task → adminSchema" --> C
+    C -- "tool: daily_report()" --> R[daily_report<br/>secuencial]
+    R --> P[daily_analysis<br/>paralelo]
+    P --> V[sales_analyst] & K[stock_analyst] & W[reviews_analyst]
+    R --> RW[report_writer<br/>skill + reportSchema]
+    V & K & W -- "MCP (solo lectura)" --> M
 ```
 
 Qué usa del curso: delegación (ver `my_multiagent_delegation`), `ModeTask` con `OutputSchema` (ver `my_multiagent_modes`) y un MCP por HTTP con token (ver `my_agent_with_mcp`).
@@ -81,6 +87,37 @@ sequenceDiagram
 
 > Por ahora cualquier usuario del chat puede aprobar sus propias solicitudes; el control por roles no forma parte de las fases del curso.
 
+## El analista: reporte del día (fase 5)
+
+`analyst.go` arma un pipeline que el coordinador usa como una **tool** (`agenttool`):
+
+```mermaid
+graph LR
+    subgraph daily_report["daily_report (secuencial)"]
+        direction LR
+        subgraph daily_analysis["daily_analysis (paralelo)"]
+            S[sales_analyst<br/>list_sales]
+            K[stock_analyst<br/>get_stock]
+            R[reviews_analyst<br/>list_reviews]
+        end
+        W[report_writer<br/>skill reporte-del-dia<br/>OutputSchema]
+    end
+    S -- "sales_analysis" --> W
+    K -- "stock_analysis" --> W
+    R -- "reviews_analysis" --> W
+```
+
+| Pieza | Concepto del curso | Qué hace aquí |
+|---|---|---|
+| `daily_analysis` | **Paralelo** | Los tres especialistas consultan al mismo tiempo; cada uno ve **solo** sus tools de solo lectura (`tool.FilterToolset`) |
+| `OutputKey` | Estado compartido | Cada especialista deja su resumen en `sales_analysis`, `stock_analysis` o `reviews_analysis` |
+| `daily_report` | **Secuencial** | Primero el análisis en paralelo y, cuando terminan los tres, el redactor |
+| `report_writer` | **Skill** | Carga `skills/reporte-del-dia` (criterios del reporte: alertas, tono, recomendaciones); las skills viajan embebidas en el binario (`go:embed`) |
+| `reportSchema` | **Salida estructurada** | El redactor responde un JSON con `headline`, `sales_summary`, `stock_alerts`, `review_summary` y `recommendations` |
+| `InstructionProvider` | Instrucción dinámica | El modelo no sabe qué día es: cada ejecución inserta la fecha de hoy para que consulten solo las ventas y reseñas de ese día |
+
+El coordinador recibe ese JSON como resultado de la tool y lo presenta en texto plano.
+
 ## Ejecutar
 
 Tres procesos, cada uno en su terminal:
@@ -132,4 +169,5 @@ En el menú **Asistente**:
 3. Pide 50 panes de queso → el barista explica que no hay stock suficiente.
 4. `¿Cuánto es 2+2?` → el coordinador responde que solo ayuda con la cafetería.
 5. `Llegaron 40 panes de queso, actualiza el inventario` → aparece la tarjeta "¿Cambiar el inventario de Pan de queso de 3 a 43 unidades?". Aprueba y revisa **Inventario**; con "Rechazar" no cambia nada.
-6. `Aplica un 30% de descuento a la venta 5, cliente frecuente` → en la tarjeta cambia el porcentaje a 20 y aprueba. En **Ventas** la venta 5 muestra `−20%`.
+7. `Aplica un 30% de descuento a la venta 5, cliente frecuente` → en la tarjeta cambia el porcentaje a 20 y aprueba. En **Ventas** la venta 5 muestra `−20%`.
+8. `Dame el reporte del día` → tarda unos 8 segundos y muestra titular, ventas, alertas de inventario, reseñas y recomendaciones. Con el pan de queso en 3 (mínimo 10), debe aparecer como alerta crítica.

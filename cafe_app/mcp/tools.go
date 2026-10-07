@@ -41,11 +41,12 @@ type SaleItem struct {
 }
 
 type Sale struct {
-	ID        int        `json:"id"`
-	Customer  string     `json:"customer"`
-	Total     int        `json:"total" jsonschema:"total en pesos"`
-	CreatedAt string     `json:"created_at"`
-	Items     []SaleItem `json:"items"`
+	ID              int        `json:"id"`
+	Customer        string     `json:"customer"`
+	Total           int        `json:"total" jsonschema:"total final en pesos, con el descuento incluido"`
+	DiscountPercent int        `json:"discount_percent" jsonschema:"descuento ya aplicado a la venta, en porcentaje"`
+	CreatedAt       string     `json:"created_at"`
+	Items           []SaleItem `json:"items"`
 }
 
 type Review struct {
@@ -76,8 +77,13 @@ func registerTools(s *mcp.Server, app *appclient.Client) {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_sales",
-		Description: "Lista las últimas ventas, la más reciente primero, con sus productos y total en pesos.",
+		Description: "Lista las últimas ventas, la más reciente primero, con sus productos y total en pesos. Con date devuelve solo las de ese día; el total ya incluye el descuento (discount_percent).",
 	}, listSales(app))
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "list_reviews",
+		Description: "Lista las reseñas de los clientes, la más reciente primero, con calificación de 1 a 5. Con date devuelve solo las de ese día.",
+	}, listReviews(app))
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_sale",
@@ -157,7 +163,8 @@ func listCustomers(app *appclient.Client) mcp.ToolHandlerFor[struct{}, customers
 // --- list_sales ---
 
 type salesIn struct {
-	Limit int `json:"limit,omitempty" jsonschema:"cuántas ventas devolver (por defecto 10, máximo 100)"`
+	Limit int    `json:"limit,omitempty" jsonschema:"cuántas ventas devolver (por defecto 10, máximo 100)"`
+	Date  string `json:"date,omitempty" jsonschema:"solo las ventas de ese día, con formato AAAA-MM-DD (opcional)"`
 }
 
 type salesOut struct {
@@ -172,9 +179,37 @@ func listSales(app *appclient.Client) mcp.ToolHandlerFor[salesIn, salesOut] {
 		}
 		limit = min(limit, 100)
 		out := salesOut{Sales: []Sale{}}
-		path := "/api/sales?" + url.Values{"limit": {fmt.Sprint(limit)}}.Encode()
+		query := url.Values{"limit": {fmt.Sprint(limit)}}
+		if in.Date != "" {
+			query.Set("date", in.Date)
+		}
+		path := "/api/sales?" + query.Encode()
 		if err := app.Do(ctx, "GET", path, nil, &out.Sales); err != nil {
 			return nil, salesOut{}, err
+		}
+		return nil, out, nil
+	}
+}
+
+// --- list_reviews ---
+
+type reviewsIn struct {
+	Date string `json:"date,omitempty" jsonschema:"solo las reseñas de ese día, con formato AAAA-MM-DD (opcional)"`
+}
+
+type reviewsOut struct {
+	Reviews []Review `json:"reviews"`
+}
+
+func listReviews(app *appclient.Client) mcp.ToolHandlerFor[reviewsIn, reviewsOut] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in reviewsIn) (*mcp.CallToolResult, reviewsOut, error) {
+		out := reviewsOut{Reviews: []Review{}}
+		path := "/api/reviews"
+		if in.Date != "" {
+			path += "?" + url.Values{"date": {in.Date}}.Encode()
+		}
+		if err := app.Do(ctx, "GET", path, nil, &out.Reviews); err != nil {
+			return nil, reviewsOut{}, err
 		}
 		return nil, out, nil
 	}

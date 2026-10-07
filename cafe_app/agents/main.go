@@ -165,6 +165,15 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// Analista: el reporte del día (paralelo + secuencial) como tool del coordinador
+	// ----------------------------------------------
+	reportTool, err := dailyReport(model, cafeTools)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// Coordinador
 	// El barista y el administrador (ModeTask) se vuelven tools del coordinador.
 	// ----------------------------------------------
@@ -182,11 +191,18 @@ func main() {
 			  número de venta, total en pesos y resumen.
 			- Si piden ver o cambiar el inventario, o aplicar un descuento a una
 			  venta, usa "administrador". Cuando termine, dile al usuario el resultado.
+			- Si piden el reporte del día, el resumen del negocio o cómo va el día,
+			  llama a "daily_report" de inmediato y responde solo cuando tengas su
+			  resultado (no avises antes que lo estás preparando). Preséntalo en texto
+			  plano con cada parte en su propia línea, separadas por una línea en
+			  blanco: titular, ventas, alertas de inventario, reseñas y
+			  recomendaciones (una por línea, numeradas).
 			- Si te saluda, salúdalo y pregúntale en qué le puedes ayudar.
 			- Si te pide algo que no tiene que ver con la cafetería, dile con
 			  amabilidad que solo puedes ayudar con la cafetería.
 		`,
 		SubAgents: []agent.Agent{barista, administrador},
+		Tools:     []tool.Tool{reportTool},
 	}
 	coordinator, err := llmagent.New(coordinatorConfig)
 	if err != nil {

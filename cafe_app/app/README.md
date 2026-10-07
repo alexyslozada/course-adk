@@ -45,9 +45,9 @@ Se autentica con un **JWT** (HS256, expira a las 24 horas). El navegador lo reci
 | `GET /api/products` · `POST /api/products` | Lista / crea productos |
 | `GET /api/inventory` · `PUT /api/inventory/{product_id}` | Lista / fija cantidad y mínimo |
 | `GET /api/customers` · `POST /api/customers` | Lista / crea clientes |
-| `GET /api/sales?limit=50` · `POST /api/sales` | Lista / registra una venta (`items`: producto y cantidad) |
+| `GET /api/sales?limit=50&date=AAAA-MM-DD` · `POST /api/sales` | Lista (con `date`, solo ese día) / registra una venta (`items`: producto y cantidad) |
 | `GET /api/sales/{id}` · `POST /api/sales/{id}/discount` | Consulta una venta / le aplica un descuento (`percent` de 1 a 50, una sola vez por venta) |
-| `GET /api/reviews` · `POST /api/reviews` | Lista / crea reseñas |
+| `GET /api/reviews?date=AAAA-MM-DD` · `POST /api/reviews` | Lista (con `date`, solo ese día) / crea reseñas |
 
 ```bash
 TOKEN=$(curl -s -d '{"username":"cajero","password":"cajero123"}' localhost:8080/api/login | jq -r .token)
