@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"alexyslozada/course-adk/cafe_app/internal/appclient"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -39,12 +40,12 @@ func main() {
 		log.Fatal("Debes configurar CAFE_MCP_TOKEN (el token que deben enviar los agentes)")
 	}
 
-	config := Config{
+	config := appclient.Config{
 		AppURL:      getenv("CAFE_APP_URL", "http://localhost:8080"),
 		AppUser:     getenv("CAFE_APP_USER", "asistente"),
 		AppPassword: getenv("CAFE_APP_PASSWORD", "asistente123"),
 	}
-	app := newAppClient(config)
+	app := appclient.New(config)
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "cafe-mcp", Version: "1.0.0"}, nil)
 	registerTools(server, app)

@@ -3,7 +3,7 @@
   <td>{{date .CreatedAt}}</td>
   <td>{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
   <td>{{range $i, $it := .Items}}{{if $i}}, {{end}}{{$it.Quantity}} × {{$it.Name}}{{end}}</td>
-  <td class="num">{{money .Total}}</td>
+  <td class="num">{{money .Total}}{{if .DiscountPercent}} <span class="badge ok">−{{.DiscountPercent}}%</span>{{end}}</td>
   <td>{{.Cashier}}</td>
 </tr>{{end}}
 

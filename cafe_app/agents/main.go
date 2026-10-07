@@ -1,4 +1,4 @@
-// Sistema de agentes de la cafetería (ADK): un coordinador que delega los pedidos en el barista.
+// Sistema de agentes de la cafetería (ADK): un coordinador que delega en el barista y el administrador.
 package main
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"alexyslozada/course-adk/cafe_app/internal/appclient"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/cmd/launcher"
@@ -20,6 +21,14 @@ type Config struct {
 	GoogleAPIKey string
 	MCPURL       string
 	MCPToken     string
+	App          appclient.Config // la API de la app, para las tools Go del administrador
+}
+
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func loadConfig() (Config, error) {
@@ -27,6 +36,11 @@ func loadConfig() (Config, error) {
 		GoogleAPIKey: os.Getenv("GOOGLE_API_KEY"),
 		MCPURL:       os.Getenv("CAFE_MCP_URL"),
 		MCPToken:     os.Getenv("CAFE_MCP_TOKEN"),
+		App: appclient.Config{
+			AppURL:      getenv("CAFE_APP_URL", "http://localhost:8080"),
+			AppUser:     getenv("CAFE_APP_USER", "asistente"),
+			AppPassword: getenv("CAFE_APP_PASSWORD", "asistente123"),
+		},
 	}
 	if config.MCPURL == "" {
 		config.MCPURL = "http://localhost:8090"
@@ -111,8 +125,48 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// Administrador en modo task
+	// Sus tools son funciones Go que llaman a la API de la app. Las que cambian
+	// datos piden confirmación humana (HITL): el ADK pausa hasta que alguien responde.
+	// ----------------------------------------------
+	adminTools, err := admin{app: appclient.New(config.App)}.tools()
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	administratorConfig := llmagent.Config{
+		Name:        "administrador",
+		Model:       model,
+		Description: "Administra la cafetería: consulta y ajusta el inventario y aplica descuentos a ventas.",
+		Instruction: `
+			Eres el administrador de la cafetería. Habla siempre en español, de forma
+			breve, en texto plano (sin Markdown).
+
+			- Para ver el inventario usa "get_inventory". Nunca inventes cantidades.
+			- Para cambiar el inventario usa "adjust_inventory" con la cantidad total
+			  que debe quedar. Si el usuario da una diferencia ("llegaron 30"), suma
+			  esa diferencia a la cantidad actual.
+			- Para un descuento a una venta usa "approve_discount". El número de venta
+			  y el porcentaje deben venir del usuario; si falta alguno, pregúntalo.
+			- Esas dos tools piden la confirmación de una persona. Mientras esté
+			  pendiente, avísale al usuario que debe aprobar o rechazar y espera.
+			  Nunca digas que se hizo un cambio hasta que la tool lo confirme.
+			- Cuando el cambio se aplique, o el administrador lo rechace, termina la
+			  tarea con el resultado.
+		`,
+		Mode:         llmagent.ModeTask,
+		OutputSchema: &adminSchema,
+		Tools:        adminTools,
+	}
+	administrador, err := llmagent.New(administratorConfig)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// Coordinador
-	// El barista (ModeTask) se vuelve una tool del coordinador.
+	// El barista y el administrador (ModeTask) se vuelven tools del coordinador.
 	// ----------------------------------------------
 	coordinatorConfig := llmagent.Config{
 		Name:        "cafe_coordinator",
@@ -126,11 +180,13 @@ func main() {
 			- Si el cliente quiere pedir algo (bebidas, comida, postres), o pregunta
 			  qué hay en el menú, usa "barista". Cuando termine, confirma el pedido:
 			  número de venta, total en pesos y resumen.
+			- Si piden ver o cambiar el inventario, o aplicar un descuento a una
+			  venta, usa "administrador". Cuando termine, dile al usuario el resultado.
 			- Si te saluda, salúdalo y pregúntale en qué le puedes ayudar.
 			- Si te pide algo que no tiene que ver con la cafetería, dile con
 			  amabilidad que solo puedes ayudar con la cafetería.
 		`,
-		SubAgents: []agent.Agent{barista},
+		SubAgents: []agent.Agent{barista, administrador},
 	}
 	coordinator, err := llmagent.New(coordinatorConfig)
 	if err != nil {
@@ -140,7 +196,7 @@ func main() {
 
 	// ----------------------------------------------
 	// Lanzar el agente
-	// Se lanza solo el coordinador: el barista vive dentro de él.
+	// Se lanza solo el coordinador: el barista y el administrador viven dentro de él.
 	// ----------------------------------------------
 	launcherConfig := launcher.Config{
 		AgentLoader: agent.NewSingleLoader(coordinator),

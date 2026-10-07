@@ -1,6 +1,31 @@
+{{define "chat_reply"}}
+{{if .Text}}<div class="msg bot">{{.Text}}</div>{{end}}
+{{with .Confirmation}}
+<form class="confirm" hx-post="/asistente/confirmar" hx-target="closest .confirm" hx-swap="outerHTML" hx-indicator="#thinking">
+  <strong>Se necesita tu aprobación</strong>
+  <p>{{.Hint}}</p>
+  {{range .Fields}}
+  <label>{{.Label}}
+    <input name="{{if .Numeric}}n.{{else}}t.{{end}}{{.Name}}" value="{{.Value}}" {{if .Numeric}}type="number" step="any"{{end}} required>
+  </label>
+  {{end}}
+  <input type="hidden" name="call_id" value="{{.CallID}}">
+  <div class="actions">
+    <button name="decision" value="approve">Aprobar</button>
+    <button name="decision" value="reject" class="secondary">Rechazar</button>
+  </div>
+</form>
+{{end}}
+{{end}}
+
 {{define "chat_exchange"}}
 <div class="msg user">{{.Question}}</div>
-<div class="msg bot">{{.Answer}}</div>
+{{template "chat_reply" .}}
+{{end}}
+
+{{define "chat_decision"}}
+<div class="msg system">{{if .Approved}}✔ Aprobaste la solicitud{{else}}✖ Rechazaste la solicitud{{end}}</div>
+{{template "chat_reply" .}}
 {{end}}
 
 {{define "content"}}
@@ -8,7 +33,7 @@
   <form method="post" action="/asistente/nueva"><button class="secondary">Nueva conversación</button></form>
 </div>
 <div id="chat" class="chat">
-  <div class="msg bot">¡Hola! Soy el asistente de la cafetería. Puedes pedirme productos y yo registro la venta.</div>
+  <div class="msg bot">¡Hola! Soy el asistente de la cafetería. Puedes pedirme productos, consultar o ajustar el inventario y aplicar descuentos a ventas.</div>
 </div>
 <form class="inline chat-form" hx-post="/asistente/mensaje" hx-target="#chat" hx-swap="beforeend" hx-indicator="#thinking"
       hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Retarget')) { this.reset(); document.getElementById('chat').lastElementChild.scrollIntoView({block: 'end'}) }">

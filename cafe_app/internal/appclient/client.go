@@ -1,4 +1,5 @@
-package main
+// Package appclient es el cliente de la API REST de la cafetería que comparten el MCP y los agentes.
+package appclient
 
 import (
 	"bytes"
@@ -12,16 +13,16 @@ import (
 	"time"
 )
 
-// Config agrupa lo que necesita el servidor MCP para hablar con la app.
+// Config agrupa lo que se necesita para hablar con la app.
 type Config struct {
 	AppURL      string // dirección de la API de la cafetería
 	AppUser     string // usuario de servicio con el que se entra a la API
 	AppPassword string
 }
 
-// appClient llama a la API de la app. Hace login con el usuario de servicio,
+// Client llama a la API de la app. Hace login con el usuario de servicio,
 // guarda el JWT y vuelve a entrar si la app responde 401 (token vencido).
-type appClient struct {
+type Client struct {
 	cfg  Config
 	http *http.Client
 
@@ -29,17 +30,18 @@ type appClient struct {
 	token string
 }
 
-func newAppClient(cfg Config) *appClient {
-	return &appClient{cfg: cfg, http: &http.Client{Timeout: 10 * time.Second}}
+// New crea el cliente.
+func New(cfg Config) *Client {
+	return &Client{cfg: cfg, http: &http.Client{Timeout: 10 * time.Second}}
 }
 
-// apiError es un error de negocio de la app (por ejemplo, "no hay stock suficiente").
+// APIError es un error de negocio de la app (por ejemplo, "no hay stock suficiente").
 // Su mensaje es el que ve el modelo, así que debe ser legible.
-type apiError struct{ msg string }
+type APIError struct{ msg string }
 
-func (e apiError) Error() string { return e.msg }
+func (e APIError) Error() string { return e.msg }
 
-func (c *appClient) login(ctx context.Context) error {
+func (c *Client) login(ctx context.Context) error {
 	var out struct {
 		Token string `json:"token"`
 	}
@@ -53,14 +55,14 @@ func (c *appClient) login(ctx context.Context) error {
 	return nil
 }
 
-func (c *appClient) currentToken() string {
+func (c *Client) currentToken() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.token
 }
 
-// do ejecuta una llamada autenticada; si no hay token o venció, entra de nuevo y reintenta una vez.
-func (c *appClient) do(ctx context.Context, method, path string, body, out any) error {
+// Do ejecuta una llamada autenticada; si no hay token o venció, entra de nuevo y reintenta una vez.
+func (c *Client) Do(ctx context.Context, method, path string, body, out any) error {
 	if c.currentToken() == "" {
 		if err := c.login(ctx); err != nil {
 			return err
@@ -78,7 +80,7 @@ func (c *appClient) do(ctx context.Context, method, path string, body, out any) 
 
 var errUnauthorized = errors.New("no autenticado")
 
-func (c *appClient) send(ctx context.Context, method, path, token string, body, out any) error {
+func (c *Client) send(ctx context.Context, method, path, token string, body, out any) error {
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -114,7 +116,7 @@ func (c *appClient) send(ctx context.Context, method, path, token string, body, 
 		if e.Error == "" {
 			e.Error = resp.Status
 		}
-		return apiError{e.Error}
+		return APIError{e.Error}
 	}
 	if out == nil {
 		return nil
