@@ -1,9 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"math"
 	"net/url"
+	"slices"
 
 	"alexyslozada/course-adk/cafe_app/internal/appclient"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -84,6 +87,16 @@ func registerTools(s *mcp.Server, app *appclient.Client) {
 		Name:        "list_reviews",
 		Description: "Lista las reseñas de los clientes, la más reciente primero, con calificación de 1 a 5. Con date devuelve solo las de ese día.",
 	}, listReviews(app))
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "sales_summary",
+		Description: "Resumen de las ventas de un día calculado por el sistema: cantidad, total en pesos, ventas con descuento y productos más vendidos. Úsalo para dar cifras: no las calcules tú.",
+	}, salesSummary(app))
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "reviews_summary",
+		Description: "Resumen de las reseñas de un día calculado por el sistema: cantidad, calificación promedio y las reseñas de 1 o 2 estrellas. Úsalo para dar cifras: no las calcules tú.",
+	}, reviewsSummary(app))
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_sale",
@@ -210,6 +223,91 @@ func listReviews(app *appclient.Client) mcp.ToolHandlerFor[reviewsIn, reviewsOut
 		}
 		if err := app.Do(ctx, "GET", path, nil, &out.Reviews); err != nil {
 			return nil, reviewsOut{}, err
+		}
+		return nil, out, nil
+	}
+}
+
+// --- sales_summary ---
+// Los resúmenes los calcula el código: un LLM que suma una lista de totales da un resultado distinto
+// cada vez, y una lista larga se le trunca.
+
+type summaryIn struct {
+	Date string `json:"date,omitempty" jsonschema:"día a resumir, con formato AAAA-MM-DD (por defecto, todos los registros)"`
+}
+
+type ProductUnits struct {
+	Product string `json:"product"`
+	Units   int    `json:"units"`
+}
+
+type salesSummaryOut struct {
+	Sales        int            `json:"sales" jsonschema:"cantidad de ventas"`
+	Total        int            `json:"total" jsonschema:"suma de los totales finales, en pesos"`
+	WithDiscount int            `json:"sales_with_discount" jsonschema:"ventas que llevaron descuento"`
+	TopProducts  []ProductUnits `json:"top_products" jsonschema:"los productos más vendidos, de mayor a menor"`
+}
+
+func salesSummary(app *appclient.Client) mcp.ToolHandlerFor[summaryIn, salesSummaryOut] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in summaryIn) (*mcp.CallToolResult, salesSummaryOut, error) {
+		path := "/api/sales?limit=500"
+		if in.Date != "" {
+			path += "&" + url.Values{"date": {in.Date}}.Encode()
+		}
+		var sales []Sale
+		if err := app.Do(ctx, "GET", path, nil, &sales); err != nil {
+			return nil, salesSummaryOut{}, err
+		}
+		out := salesSummaryOut{Sales: len(sales), TopProducts: []ProductUnits{}}
+		units := map[string]int{}
+		for _, s := range sales {
+			out.Total += s.Total
+			if s.DiscountPercent > 0 {
+				out.WithDiscount++
+			}
+			for _, it := range s.Items {
+				units[it.Name] += it.Quantity
+			}
+		}
+		for name, n := range units {
+			out.TopProducts = append(out.TopProducts, ProductUnits{Product: name, Units: n})
+		}
+		slices.SortFunc(out.TopProducts, func(a, b ProductUnits) int {
+			return cmp.Or(cmp.Compare(b.Units, a.Units), cmp.Compare(a.Product, b.Product))
+		})
+		out.TopProducts = out.TopProducts[:min(len(out.TopProducts), 5)]
+		return nil, out, nil
+	}
+}
+
+// --- reviews_summary ---
+
+type reviewsSummaryOut struct {
+	Reviews  int      `json:"reviews" jsonschema:"cantidad de reseñas"`
+	Average  float64  `json:"average_rating" jsonschema:"calificación promedio, de 1 a 5"`
+	Negative []Review `json:"negative_reviews" jsonschema:"reseñas de 1 o 2 estrellas"`
+}
+
+func reviewsSummary(app *appclient.Client) mcp.ToolHandlerFor[summaryIn, reviewsSummaryOut] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in summaryIn) (*mcp.CallToolResult, reviewsSummaryOut, error) {
+		path := "/api/reviews"
+		if in.Date != "" {
+			path += "?" + url.Values{"date": {in.Date}}.Encode()
+		}
+		var reviews []Review
+		if err := app.Do(ctx, "GET", path, nil, &reviews); err != nil {
+			return nil, reviewsSummaryOut{}, err
+		}
+		out := reviewsSummaryOut{Reviews: len(reviews), Negative: []Review{}}
+		sum := 0
+		for _, r := range reviews {
+			sum += r.Rating
+			if r.Rating <= 2 {
+				out.Negative = append(out.Negative, r)
+			}
+		}
+		if len(reviews) > 0 {
+			out.Average = math.Round(float64(sum)/float64(len(reviews))*100) / 100
 		}
 		return nil, out, nil
 	}

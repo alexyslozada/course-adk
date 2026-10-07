@@ -33,7 +33,7 @@ Usuarios de ejemplo: `admin` / `admin123` y `cajero` / `cajero123`. Además `asi
 
 ## Menús
 
-Inventario (edición en línea; marca el stock bajo), Productos, Ventas, Clientes, Reseñas y **Asistente** (chat con los agentes; ver [`../agents`](../agents)). En el **Asistente**, cuando un agente necesita la aprobación de una persona (inventario, descuentos), el chat muestra una tarjeta con Aprobar / Rechazar y los valores que se pueden modificar. Los formularios usan htmx: el servidor responde solo la fila nueva, y los errores aparecen en la línea roja sin recargar la página.
+Inventario (edición en línea; marca el stock bajo), Productos, Ventas, Clientes, Reseñas y **Asistente** (chat con los agentes; ver [`../agents`](../agents)). En cada turno del **Asistente** hablan varios agentes, pero la página muestra solo el **último mensaje** (la respuesta final): mostrarlos todos repetía la misma respuesta. El Asistente guarda la conversación en los agentes (sesión en SQLite) y la recuerda con una cookie: al recargar la página, o después de reiniciar los agentes, el chat muestra lo conversado. Cuando un agente necesita la aprobación de una persona (inventario, descuentos), el chat muestra una tarjeta con Aprobar / Rechazar y los valores que se pueden modificar. Los formularios usan htmx: el servidor responde solo la fila nueva, y los errores aparecen en la línea roja sin recargar la página.
 
 ## API REST
 

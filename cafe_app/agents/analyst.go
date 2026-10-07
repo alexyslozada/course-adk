@@ -13,7 +13,6 @@ import (
 	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/tool"
-	"google.golang.org/adk/v2/tool/agenttool"
 	"google.golang.org/adk/v2/tool/skilltoolset"
 	"google.golang.org/adk/v2/tool/skilltoolset/skill"
 )
@@ -42,7 +41,7 @@ func specialist(m model.LLM, cafeTools tool.Toolset, name, description, task, ou
 				en texto plano, con un máximo de 6 líneas.
 			`, today(), task), nil
 		},
-		Toolsets:  []tool.Toolset{tool.FilterToolset(cafeTools, tool.StringPredicate(allowed))},
+		Toolsets:  []tool.Toolset{tool.FilterToolset(cafeTools, tool.AllowedToolsPredicate(allowed))},
 		OutputKey: outputKey,
 	}
 	return llmagent.New(specialistConfig)
@@ -59,26 +58,29 @@ func dailyReport(m model.LLM, cafeTools tool.Toolset) (tool.Tool, error) {
 	// ----------------------------------------------
 	sales, err := specialist(m, cafeTools, "sales_analyst",
 		"Analiza las ventas de hoy.",
-		`Analiza las ventas de hoy: consulta "list_sales" con la fecha de hoy y reporta
-		 cuántas ventas hubo, el total en pesos (cada total ya incluye su descuento),
-		 los productos más vendidos y cuántas ventas llevaron descuento.`,
-		"sales_analysis", "list_sales")
+		`Analiza las ventas de hoy: consulta "sales_summary" con la fecha de hoy y reporta
+		 sus cifras tal cual: cuántas ventas hubo, el total en pesos (ya incluye los
+		 descuentos), los productos más vendidos y cuántas ventas llevaron descuento.
+		 No sumes ni calcules nada tú: usa las cifras de la herramienta.`,
+		"sales_analysis", "sales_summary")
 	if err != nil {
 		return nil, err
 	}
 	stock, err := specialist(m, cafeTools, "stock_analyst",
 		"Revisa el inventario.",
-		`Revisa el inventario: consulta "get_stock" y reporta qué productos están en o
-		 bajo su mínimo, con su cantidad y su mínimo.`,
+		`Revisa el inventario: consulta "get_stock" con low_only en true y reporta los
+		 productos que devuelve, con su cantidad y su mínimo. Si no devuelve ninguno,
+		 dilo.`,
 		"stock_analysis", "get_stock")
 	if err != nil {
 		return nil, err
 	}
 	reviews, err := specialist(m, cafeTools, "reviews_analyst",
 		"Analiza las reseñas de hoy.",
-		`Analiza las reseñas de hoy: consulta "list_reviews" con la fecha de hoy y reporta
-		 cuántas hubo, la calificación promedio y las de 1 o 2 estrellas con su comentario.`,
-		"reviews_analysis", "list_reviews")
+		`Analiza las reseñas de hoy: consulta "reviews_summary" con la fecha de hoy y reporta
+		 sus cifras tal cual: cuántas hubo, la calificación promedio y las de 1 o 2
+		 estrellas con su comentario. No calcules nada tú: usa las cifras de la herramienta.`,
+		"reviews_analysis", "reviews_summary")
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +144,7 @@ func dailyReport(m model.LLM, cafeTools tool.Toolset) (tool.Tool, error) {
 	if err != nil {
 		return nil, err
 	}
-	// agenttool lo convierte en una tool del coordinador: la llama como a cualquier función.
-	return agenttool.New(pipeline, nil), nil
+	// Se expone como una tool del coordinador sin parámetros: siempre arranca con la misma orden,
+	// así que nada de lo que escriba el cliente puede colarse en el reporte.
+	return fixedInputTool(pipeline.Name(), pipeline, "Genera el reporte del día de hoy.")
 }

@@ -20,6 +20,8 @@ El MCP no toca la base de datos: llama a la API de la app, así las reglas (stoc
 | `list_customers` | Clientes con su id |
 | `list_sales` | Últimas ventas (`limit`, por defecto 10; `date` AAAA-MM-DD para un solo día) |
 | `list_reviews` | Reseñas con su calificación (`date` para un solo día) |
+| `sales_summary` | Resumen de un día **calculado por el sistema**: ventas, total, ventas con descuento y más vendidos |
+| `reviews_summary` | Resumen de un día calculado por el sistema: cantidad, promedio y reseñas de 1 o 2 estrellas |
 | `create_sale` | Registra una venta y descuenta el stock; falla si no alcanza |
 | `create_review` | Registra una reseña de 1 a 5 |
 
