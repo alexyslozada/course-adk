@@ -1,0 +1,15 @@
+{{define "product_row"}}<tr><td>{{.Name}}</td><td>{{.Category}}</td><td class="num">{{money .Price}}</td></tr>{{end}}
+
+{{define "content"}}
+<form class="inline" hx-post="/productos" hx-target="#products-body" hx-swap="beforeend"
+      hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Retarget')) this.reset()">
+  <input name="name" placeholder="Nombre" required>
+  <input name="category" placeholder="Categoría" required>
+  <input name="price" type="number" min="1" placeholder="Precio" required>
+  <button>Agregar producto</button>
+</form>
+<table>
+  <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th></tr></thead>
+  <tbody id="products-body">{{range .Data}}{{template "product_row" .}}{{end}}</tbody>
+</table>
+{{end}}

@@ -2,3 +2,5 @@
 .DS_Store
 my_agent_with_skills/my_agent_with_skills
 *.db
+*.db-shm
+*.db-wal

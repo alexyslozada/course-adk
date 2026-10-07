@@ -1,0 +1,34 @@
+{{define "review_row"}}<tr>
+  <td>{{date .CreatedAt}}</td>
+  <td>{{if .Customer}}{{.Customer}}{{else}}—{{end}}</td>
+  <td>{{if .Product}}{{.Product}}{{else}}General{{end}}</td>
+  <td class="stars">{{stars .Rating}}</td>
+  <td>{{.Comment}}</td>
+</tr>{{end}}
+
+{{define "content"}}
+<form class="inline" hx-post="/resenas" hx-target="#reviews-body" hx-swap="afterbegin"
+      hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Retarget')) this.reset()">
+  <select name="customer_id">
+    <option value="">Sin cliente</option>
+    {{range .Data.Customers}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+  </select>
+  <select name="product_id">
+    <option value="">Reseña general</option>
+    {{range .Data.Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+  </select>
+  <select name="rating">
+    <option value="5">5 ★</option>
+    <option value="4">4 ★</option>
+    <option value="3">3 ★</option>
+    <option value="2">2 ★</option>
+    <option value="1">1 ★</option>
+  </select>
+  <input name="comment" placeholder="Comentario">
+  <button>Agregar reseña</button>
+</form>
+<table>
+  <thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Calificación</th><th>Comentario</th></tr></thead>
+  <tbody id="reviews-body">{{range .Data.Reviews}}{{template "review_row" .}}{{end}}</tbody>
+</table>
+{{end}}

@@ -1,0 +1,15 @@
+{{define "inventory_row"}}<tr {{if .Low}}class="low"{{end}}>
+  <td>{{.Name}}</td>
+  <td>{{.Category}}</td>
+  <td><input type="number" name="quantity" min="0" value="{{.Quantity}}"></td>
+  <td><input type="number" name="min_quantity" min="0" value="{{.MinQuantity}}"></td>
+  <td>{{if .Low}}<span class="badge">Stock bajo</span>{{end}}</td>
+  <td><button hx-post="/inventario/{{.ProductID}}" hx-include="closest tr" hx-target="closest tr" hx-swap="outerHTML">Guardar</button></td>
+</tr>{{end}}
+
+{{define "content"}}
+<table>
+  <thead><tr><th>Producto</th><th>Categoría</th><th>Cantidad</th><th>Mínimo</th><th></th><th></th></tr></thead>
+  <tbody>{{range .Data}}{{template "inventory_row" .}}{{end}}</tbody>
+</table>
+{{end}}

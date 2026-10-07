@@ -1,0 +1,14 @@
+{{define "customer_row"}}<tr><td>{{.Name}}</td><td>{{.Email}}</td></tr>{{end}}
+
+{{define "content"}}
+<form class="inline" hx-post="/clientes" hx-target="#customers-body" hx-swap="beforeend"
+      hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Retarget')) this.reset()">
+  <input name="name" placeholder="Nombre" required>
+  <input name="email" type="email" placeholder="Correo (opcional)">
+  <button>Agregar cliente</button>
+</form>
+<table>
+  <thead><tr><th>Nombre</th><th>Correo</th></tr></thead>
+  <tbody id="customers-body">{{range .Data}}{{template "customer_row" .}}{{end}}</tbody>
+</table>
+{{end}}

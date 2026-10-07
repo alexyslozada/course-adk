@@ -1,0 +1,8 @@
+{{define "content"}}
+{{with .Data}}<p class="error">{{.}}</p>{{end}}
+<form method="post" action="/login" class="stack">
+  <label>Usuario <input name="username" autocomplete="username" required autofocus></label>
+  <label>Contraseña <input name="password" type="password" autocomplete="current-password" required></label>
+  <button>Entrar</button>
+</form>
+{{end}}

@@ -1,0 +1,38 @@
+{{define "layout"}}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Cafetería</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body hx-on::before-request="document.getElementById('error').textContent = ''">
+{{if .User}}
+  <header>
+    <span>☕ Cafetería — Hola, {{.User.Name}}</span>
+    <form method="post" action="/logout"><button class="link">Salir</button></form>
+  </header>
+  <div class="shell">
+    <nav>
+      <a href="/inventario" {{if eq .Active "inventario"}}class="active"{{end}}>Inventario</a>
+      <a href="/productos" {{if eq .Active "productos"}}class="active"{{end}}>Productos</a>
+      <a href="/ventas" {{if eq .Active "ventas"}}class="active"{{end}}>Ventas</a>
+      <a href="/clientes" {{if eq .Active "clientes"}}class="active"{{end}}>Clientes</a>
+      <a href="/resenas" {{if eq .Active "resenas"}}class="active"{{end}}>Reseñas</a>
+    </nav>
+    <main>
+      <h1>{{.Title}}</h1>
+      <p id="error" class="error"></p>
+      {{template "content" .}}
+    </main>
+  </div>
+{{else}}
+  <main class="login">
+    <h1>☕ Cafetería</h1>
+    <p id="error" class="error"></p>
+    {{template "content" .}}
+  </main>
+{{end}}
+</body>
+</html>{{end}}
