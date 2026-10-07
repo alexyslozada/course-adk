@@ -9,6 +9,7 @@ graph LR
     W --> S[store.go]
     A --> S
     S --> DB[(SQLite<br/>cafe.db)]
+    W -- "menú Asistente" --> AG[agentes ADK<br/>:8081]
     W & A -. "JWT" .- AU[auth.go]
 ```
 
@@ -25,13 +26,14 @@ go run .          # http://localhost:8080
 |---|---|---|
 | `CAFE_ADDR` | `:8080` | Dirección donde escucha |
 | `CAFE_DB` | `cafe.db` | Archivo SQLite (se crea con datos de ejemplo la primera vez) |
+| `CAFE_AGENTS_URL` | `http://localhost:8081/api` | API REST del ADK a la que el menú Asistente reenvía el chat |
 | `CAFE_JWT_SECRET` | secreto de desarrollo | Clave con la que se firman los JWT (cámbiala al desplegar) |
 
 Usuarios de ejemplo: `admin` / `admin123` y `cajero` / `cajero123`. Además `asistente` / `asistente123`, el usuario de servicio que usa el MCP.
 
 ## Menús
 
-Inventario (edición en línea; marca el stock bajo), Productos, Ventas, Clientes y Reseñas. Los formularios usan htmx: el servidor responde solo la fila nueva, y los errores aparecen en la línea roja sin recargar la página.
+Inventario (edición en línea; marca el stock bajo), Productos, Ventas, Clientes, Reseñas y **Asistente** (chat con los agentes; ver [`../agents`](../agents)). Los formularios usan htmx: el servidor responde solo la fila nueva, y los errores aparecen en la línea roja sin recargar la página.
 
 ## API REST
 

@@ -1,0 +1,19 @@
+{{define "chat_exchange"}}
+<div class="msg user">{{.Question}}</div>
+<div class="msg bot">{{.Answer}}</div>
+{{end}}
+
+{{define "content"}}
+<div class="chat-tools">
+  <form method="post" action="/asistente/nueva"><button class="secondary">Nueva conversación</button></form>
+</div>
+<div id="chat" class="chat">
+  <div class="msg bot">¡Hola! Soy el asistente de la cafetería. Puedes pedirme productos y yo registro la venta.</div>
+</div>
+<form class="inline chat-form" hx-post="/asistente/mensaje" hx-target="#chat" hx-swap="beforeend" hx-indicator="#thinking"
+      hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Retarget')) { this.reset(); document.getElementById('chat').lastElementChild.scrollIntoView({block: 'end'}) }">
+  <input name="message" placeholder="Escribe tu mensaje…" autocomplete="off" required autofocus>
+  <button>Enviar</button>
+  <span id="thinking" class="htmx-indicator">Pensando…</span>
+</form>
+{{end}}

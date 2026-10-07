@@ -26,3 +26,13 @@ form.stack label { display: flex; flex-direction: column; gap: .2rem; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem; }
 label.qty { background: #fff; border: 1px solid var(--line); border-radius: .35rem; padding: .4rem; }
 .error { color: var(--warn); min-height: 1.5rem; margin: 0 0 .5rem; }
+.chat { background: #fff; border: 1px solid var(--line); border-radius: .5rem; padding: 1rem; height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1rem; }
+.msg { max-width: 75%; padding: .5rem .8rem; border-radius: .8rem; white-space: pre-wrap; }
+.msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
+.msg.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+.chat-form input[name=message] { flex: 1; min-width: 12rem; }
+.chat-tools { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
+.chat-tools form { margin: 0; }
+button.secondary { background: #fff; color: var(--accent); }
+.htmx-indicator { opacity: 0; transition: opacity .2s; align-self: center; color: var(--accent); }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }

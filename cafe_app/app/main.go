@@ -35,7 +35,7 @@ func main() {
 		secret = "secreto-de-desarrollo-cambiar-en-produccion"
 		log.Print("CAFE_JWT_SECRET no está definido: usando el secreto de desarrollo")
 	}
-	app, err := NewApp(store, []byte(secret))
+	app, err := NewApp(store, []byte(secret), newAgentsClient(getenv("CAFE_AGENTS_URL", "http://localhost:8081/api")))
 	if err != nil {
 		log.Fatalf("iniciando la app: %v", err)
 	}
