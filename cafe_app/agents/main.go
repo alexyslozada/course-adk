@@ -31,6 +31,7 @@ type Config struct {
 	MCPURL          string
 	MCPToken        string
 	SessionsDB      string           // archivo SQLite donde se guardan las conversaciones
+	BakeryURL       string           // la panadería externa, por A2A
 	App             appclient.Config // la API de la app, para las tools Go del administrador
 }
 
@@ -50,6 +51,7 @@ func loadConfig() (Config, error) {
 		MCPURL:          os.Getenv("CAFE_MCP_URL"),
 		MCPToken:        os.Getenv("CAFE_MCP_TOKEN"),
 		SessionsDB:      getenv("CAFE_SESSIONS_DB", "sessions.db"),
+		BakeryURL:       getenv("CAFE_BAKERY_URL", "http://localhost:8001"),
 		App: appclient.Config{
 			AppURL:      getenv("CAFE_APP_URL", "http://localhost:8080"),
 			AppUser:     getenv("CAFE_APP_USER", "asistente"),
@@ -223,10 +225,21 @@ func main() {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
+	// La panadería es un agente remoto (A2A): el administrador le pide pan con order_bread.
+	bakery, err := newBakeryAgent(config.BakeryURL)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	orderBread, err := restock{app: appAPI, bakery: bakery}.tool()
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 	administratorConfig := llmagent.Config{
 		Name:        "administrador",
 		Model:       model,
-		Description: "Administra la cafetería: consulta y ajusta el inventario y aplica descuentos a ventas.",
+		Description: "Administra la cafetería: consulta y ajusta el inventario, le pide pan a la panadería y aplica descuentos a ventas.",
 		Instruction: `
 			Eres el administrador de la cafetería. Habla siempre en español, de forma
 			breve, en texto plano (sin Markdown).
@@ -243,7 +256,18 @@ func main() {
 			  "avisa que hoy no hay pan de queso") usa "save_notices" con la lista
 			  completa de avisos: los actuales más el nuevo, sin el que pidan quitar.
 			  Avisos actuales: {app:avisos?}
-			- Esas dos tools piden la confirmación de una persona. Mientras esté
+			- Para pedirle pan a la panadería La Espiga (por ejemplo, "falta pan" o
+			  "pide pan de queso") usa "order_bread". Solo se piden productos de
+			  panadería; mira en "get_inventory" cuáles están en o bajo su mínimo.
+			  Si no dicen cuántas unidades, propón las necesarias para llegar al
+			  doble del mínimo: la persona puede cambiar la cantidad en la tarjeta.
+			  Si falta más de un pan, pídelos de a uno: el siguiente cuando termine
+			  el anterior. El pan llega en el día y la tool lo suma al inventario:
+			  no uses "adjust_inventory" después. En el resumen di el número de
+			  pedido de la panadería, las unidades, lo que cobra y cómo quedó el
+			  inventario.
+			- "adjust_inventory", "approve_discount" y "order_bread" piden la
+			  confirmación de una persona. Mientras esté
 			  pendiente, avísale al usuario que debe aprobar o rechazar y espera.
 			  Nunca digas que se hizo un cambio hasta que la tool lo confirme.
 			- Termina SIEMPRE llamando a finish_task, también en las consultas: nunca
@@ -259,7 +283,7 @@ func main() {
 		// Una tarea no puede transferir la conversación: debe terminar con finish_task.
 		DisallowTransferToParent: true,
 		DisallowTransferToPeers:  true,
-		Tools:                    append(adminTools, saveNotices),
+		Tools:                    append(adminTools, saveNotices, orderBread),
 	}
 	administrador, err := llmagent.New(administratorConfig)
 	if err != nil {
@@ -380,7 +404,7 @@ func main() {
 			- Si piden ver o cambiar el inventario, ver el detalle o el total de una
 			  venta (por ejemplo, "¿en cuánto me quedó la factura?"), o aplicar un
 			  descuento a una venta, o publicar o quitar un aviso para todo el equipo,
-			  usa "administrador". Cuando termine, dile al usuario el resultado.
+			  o pedirle pan a la panadería, usa "administrador". Cuando termine, dile al usuario el resultado.
 			- Si piden el reporte del día, el resumen del negocio o cómo va el día,
 			  llama a "daily_report" de inmediato y responde solo cuando tengas su
 			  resultado (no avises antes que lo estás preparando). Preséntalo en texto

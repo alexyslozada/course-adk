@@ -1,9 +1,9 @@
-# cafe_app/agents — coordinador, barista, administrador, reseñas, analista y flujos (fases 3 a 7)
+# cafe_app/agents — coordinador, barista, administrador, reseñas, analista y flujos (fases 3 a 8)
 
 El sistema de agentes de la cafetería (ADK). El **coordinador** recibe al usuario y **delega** en dos sub-agentes en `ModeTask` y en un pipeline de análisis:
 
 - el **barista** (fase 3) toma el pedido y lo registra por **MCP**;
-- el **administrador** (fase 4) consulta y ajusta el inventario y aplica descuentos con **tools Go**, pidiendo la confirmación de una persona;
+- el **administrador** (fase 4) consulta y ajusta el inventario y aplica descuentos con **tools Go**, pidiendo la confirmación de una persona; desde la fase 8 también le pide pan a la panadería externa por **A2A**;
 - el agente de **reseñas** recoge la opinión del cliente y la guarda;
 - el **analista** (fase 5) arma el reporte del día con un workflow **paralelo + secuencial**;
 - los **flujos** (fase 6) son un **grafo** que clasifica lo que quiere el cliente y lo manda por su camino, con un **loop** para armar combos.
@@ -19,6 +19,7 @@ graph TD
     C -- "tool: administrador()" --> AD[administrador<br/>ModeTask]
     AD <-. "pide aprobación" .-> U
     AD -- "tools Go" --> APP
+    AD -- "order_bread · A2A" --> BK[cafe_app/bakery<br/>panadería externa]
     AD -- "finish_task → adminSchema" --> C
     C -- "tool: daily_report()" --> R[daily_report<br/>secuencial]
     R --> P[daily_analysis<br/>paralelo]
@@ -91,6 +92,7 @@ Sus tools (`admin.go`) son funciones Go que llaman a la API de la app. Las que *
 | `get_inventory` | ninguna (solo lee) | — |
 | `adjust_inventory` | **booleana** (sí/no) | Aprobar o rechazar el cambio de stock. El aviso dice "de 3 a 43 unidades" |
 | `approve_discount` | **con modificación** | Aprobar, rechazar o **cambiar el porcentaje** (1 a 50). La app valida el rango y que la venta no tenga ya un descuento |
+| `order_bread` (fase 8) | **con modificación** | Aprobar, rechazar o **cambiar la cantidad** de pan que se le pide a la panadería (ver [más abajo](#reabastecimiento-la-panadería-por-a2a-fase-8)) |
 
 La tool se ejecuta dos veces: la primera pide la confirmación (`ToolConfirmation()` es `nil`) y el ADK pausa; la segunda, ya con la respuesta, aplica el cambio o lo descarta.
 
@@ -147,6 +149,52 @@ sequenceDiagram
 ```
 
 > Por ahora cualquier usuario del chat puede aprobar sus propias solicitudes; el control por roles no forma parte de las fases del curso.
+
+## Reabastecimiento: la panadería por A2A (fase 8)
+
+La cafetería le compra el pan a **La Espiga**, otro negocio con su propio agente (`cafe_app/bakery`, puerto 8001). Cuando falta pan, el administrador se lo pide con la tool Go `order_bread` (`restock.go`):
+
+```mermaid
+sequenceDiagram
+    actor U as Administrador
+    participant AD as administrador (LLM)
+    participant OB as order_bread (Go)
+    participant BK as panadería (A2A)
+    participant APP as app
+    U->>AD: "Falta pan de queso, pídele a la panadería"
+    AD->>OB: order_bread(product_id 7, quantity 20)
+    OB->>APP: ¿es de panadería? ¿cuánto hay?
+    OB-->>U: tarjeta: "¿Pedirle 20 unidades de Pan de queso?" (cantidad editable)
+    U->>OB: Aprobar con 25
+    OB->>BK: "Pedido de la cafetería: 25 unidades de Pan de queso."
+    BK-->>OB: {"status":"confirmado","order_id":1001,"quantity":25,"total":50000}
+    OB->>APP: inventario de 0 a 25
+    OB-->>AD: pedido 1001, $50.000, de 0 a 25
+```
+
+| Paso | Quién decide | Por qué |
+|---|---|---|
+| Qué pan y cuántos | El modelo **propone**: si no le dicen cuántos, lo que falta para llegar al doble del mínimo | Es una sugerencia; la persona la corrige en la tarjeta |
+| Que sea pan | El **código**: solo productos de la categoría Panadería | Un espresso no se le pide a la panadería |
+| Hacer el pedido | Una **persona**, con la tarjeta (HITL con modificación, como los descuentos) | Pedir pan cuesta dinero |
+| El precio y el número de pedido | La **panadería**, en su código (`place_order`) | Es su catálogo y su sistema |
+| Sumar al inventario | El **código**, con lo que la panadería confirmó | Se compara con lo que se pidió: si no coincide, no se toca el inventario |
+
+### Por qué una tool Go y no un sub-agente remoto
+
+En `my_agent_a2a` el agente remoto es un **sub-agente**: el coordinador le pasa la conversación y el modelo habla directo con la panadería. Para consultar precios eso basta, pero aquí la panadería **toma pedidos que cuestan dinero**. Si el modelo le hablara directo, podría pedir pan sin la aprobación de nadie, o con otra cantidad, y la regla "pide aprobación antes" sería solo de prompt (la lección del barista).
+
+Por eso el agente remoto (`remoteagent.NewA2A`) no está en `SubAgents`: lo usa `order_bread`, y solo **después** de la aprobación, con `runAgent` (el mismo que corre los flujos en una sesión aparte). La conversación con la panadería es **otra conversación**: la panadería solo recibe el pedido, no lo que se habló en la cafetería.
+
+### El contrato entre los dos negocios
+
+La panadería responde con su `OutputSchema` (un JSON) y no con texto libre. `order_bread` lo lee (`parseBakeryOrder`, que tolera el JSON entre ```` ``` ````) y decide en código:
+
+- `status` distinto de `confirmado` → no se toca el inventario y se explica el motivo que dio la panadería;
+- otro pan u otra cantidad que la pedida → error, sin tocar el inventario;
+- si la panadería no responde (apagada, sin red) → error claro ("no se pudo hablar con la panadería") y la tarea termina con `sin_cambios`: el chat sigue vivo.
+
+La panadería entrega en el día, así que el pan se suma al inventario apenas confirma (se vuelve a leer el inventario después de la aprobación, porque pudo cambiar mientras tanto).
 
 ## El analista: reporte del día (fase 5)
 
@@ -345,7 +393,7 @@ Para ver cuántas llamadas hace cada acción, lanza los agentes con `CAFE_LOG_MO
 
 ## Ejecutar
 
-Tres procesos, cada uno en su terminal:
+Cuatro procesos, cada uno en su terminal:
 
 ```bash
 # 1) la app (puerto 8080)
@@ -354,7 +402,11 @@ cd cafe_app/app && go run .
 # 2) el MCP (puerto 8090)
 cd cafe_app/mcp && CAFE_MCP_TOKEN=un-token-largo go run .
 
-# 3) los agentes (puerto 8081; también llaman a la app: CAFE_APP_URL, CAFE_APP_USER y CAFE_APP_PASSWORD)
+# 3) la panadería externa (puerto 8001; ver bakery/README.md)
+cd cafe_app/bakery && GOOGLE_API_KEY=... go run . web -port 8001 a2a -a2a_agent_url http://localhost:8001
+
+# 4) los agentes (puerto 8081; también llaman a la app: CAFE_APP_URL, CAFE_APP_USER y CAFE_APP_PASSWORD,
+#    y a la panadería: CAFE_BAKERY_URL)
 cd cafe_app/agents
 cp .env.example .env     # completa GOOGLE_API_KEY, ANTHROPIC_API_KEY (el barista) y el mismo CAFE_MCP_TOKEN
 set -a; source .env; set +a
@@ -407,3 +459,6 @@ En el menú **Asistente**:
 15. **Lista de conversaciones**: pulsa «Nueva conversación», escribe algo y abre la conversación anterior desde la lista de la izquierda: el chat muestra lo conversado y puedes seguir.
 16. **Memoria del usuario (`user:`)**: `Recuerda que me llamo Juancho y que prefiero respuestas cortas`. Abre una conversación nueva y pregunta `¿cómo me llamo?` → "Juancho". Con otro usuario (por ejemplo, admin) no lo sabe.
 17. **Memoria de la cafetería (`app:`)**: como admin, `Avisa a todo el equipo que hoy no hay pan de queso`. Entra como cajero, en una conversación nueva: `¿hay algún aviso para hoy?` → el aviso. Para quitarlo: `quita el aviso del pan de queso`.
+18. **Panadería (A2A)**: `¿Qué nos falta? Pídele pan de queso a la panadería` → la tarjeta "¿Pedirle 20 unidades de Pan de queso a la panadería La Espiga?" con la cantidad editable. Cámbiala y aprueba → número de pedido de la panadería, lo que cobra y el inventario actualizado (míralo en **Inventario**). Con «Rechazar» no se le pide nada.
+19. `Pídele 10 espressos a la panadería` → no se puede: solo se piden productos de panadería.
+20. Apaga la panadería y pide pan → tras aprobar, "no se pudo hablar con la panadería"; el inventario no cambia y el chat sigue funcionando.

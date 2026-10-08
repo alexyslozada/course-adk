@@ -56,4 +56,4 @@ curl -H "Authorization: Bearer $TOKEN" -X POST -d '{"customer_id":1,"items":[{"p
 
 ## Datos de ejemplo
 
-El **pan de queso** arranca con poco stock (3, mínimo 10) a propósito: en la fase 8 el administrador se lo pide a la panadería.
+El **pan de queso** arranca con poco stock (3, mínimo 10) a propósito: en la fase 8 el administrador se lo pide a la panadería (ver `agents/README.md`).
