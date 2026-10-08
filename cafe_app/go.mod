@@ -3,6 +3,7 @@ module alexyslozada/course-adk/cafe_app
 go 1.26.6
 
 require (
+	github.com/a2aproject/a2a-go/v2 v2.5.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -20,7 +21,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.36.0 // indirect
 	github.com/a2aproject/a2a-go v0.3.15 // indirect
-	github.com/a2aproject/a2a-go/v2 v2.5.0 // indirect
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

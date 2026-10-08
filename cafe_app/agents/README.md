@@ -186,6 +186,8 @@ En `my_agent_a2a` el agente remoto es un **sub-agente**: el coordinador le pasa 
 
 Por eso el agente remoto (`remoteagent.NewA2A`) no está en `SubAgents`: lo usa `order_bread`, y solo **después** de la aprobación, con `runAgent` (el mismo que corre los flujos en una sesión aparte). La conversación con la panadería es **otra conversación**: la panadería solo recibe el pedido, no lo que se habló en la cafetería.
 
+La agent card se descarga con `sameOriginCardProvider`: como la del ADK, exige que la card apunte al mismo origen que la URL configurada, pero acepta `http` fuera de `localhost`, que es como se ven los servicios dentro de docker compose (ver el [README del proyecto](../README.md)).
+
 ### El contrato entre los dos negocios
 
 La panadería responde con su `OutputSchema` (un JSON) y no con texto libre. `order_bread` lo lee (`parseBakeryOrder`, que tolera el JSON entre ```` ``` ````) y decide en código:
