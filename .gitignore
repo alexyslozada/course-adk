@@ -4,3 +4,5 @@ my_agent_with_skills/my_agent_with_skills
 *.db
 *.db-shm
 *.db-wal
+cafe_app/agents/agents
+cafe_app/app/app

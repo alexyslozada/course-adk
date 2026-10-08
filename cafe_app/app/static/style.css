@@ -31,8 +31,16 @@ label.qty { background: #fff; border: 1px solid var(--line); border-radius: .35r
 .msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
 .msg.bot { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
 .chat-form input[name=message] { flex: 1; min-width: 12rem; }
-.chat-tools { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
-.chat-tools form { margin: 0; }
+.assistant { display: flex; gap: 1rem; align-items: flex-start; }
+.assistant-chat { flex: 1; min-width: 0; }
+.conversations { width: 14rem; flex-shrink: 0; display: flex; flex-direction: column; gap: .35rem; max-height: 70vh; overflow-y: auto; }
+.conversations form { margin: 0; }
+.conversations h2 { font-size: .9rem; margin: .6rem 0 .1rem; color: #666; }
+.conversations > form:first-child button { width: 100%; }
+button.conversation { width: 100%; text-align: left; background: #fff; color: var(--fg); border-color: var(--line); }
+button.conversation small { display: block; color: #888; font-size: .75rem; }
+button.conversation.active { border-color: var(--accent); border-left-width: 3px; font-weight: 600; }
+.muted { color: #888; font-size: .85rem; }
 button.secondary { background: #fff; color: var(--accent); }
 .htmx-indicator { opacity: 0; transition: opacity .2s; align-self: center; color: var(--accent); }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }

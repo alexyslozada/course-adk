@@ -29,12 +29,23 @@
 {{end}}
 
 {{define "content"}}
-<div class="chat-tools">
+{{$current := .Data.Current}}
+<div class="assistant">
+<aside class="conversations">
   <form method="post" action="/asistente/nueva"><button class="secondary">Nueva conversación</button></form>
-</div>
+  <h2>Conversaciones</h2>
+  {{range .Data.Conversations}}
+  <form method="post" action="/asistente/abrir/{{.ID}}">
+    <button class="conversation{{if eq .ID $current}} active{{end}}">{{.Title}}<small>{{.Updated.Format "02/01/2006 15:04"}}</small></button>
+  </form>
+  {{else}}
+  <p class="muted">Aún no tienes conversaciones.</p>
+  {{end}}
+</aside>
+<div class="assistant-chat">
 <div id="chat" class="chat">
   <div class="msg bot">¡Hola! Soy el asistente de la cafetería. Puedes pedirme productos, consultar o ajustar el inventario y aplicar descuentos a ventas.</div>
-  {{range .Data}}{{template "chat_exchange" .}}{{end}}
+  {{range .Data.History}}{{template "chat_exchange" .}}{{end}}
 </div>
 <script>{ const chat = document.getElementById('chat'); chat.scrollTop = chat.scrollHeight }</script>
 <form class="inline chat-form" hx-post="/asistente/mensaje" hx-target="#chat" hx-swap="beforeend" hx-indicator="#thinking"
@@ -43,4 +54,6 @@
   <button>Enviar</button>
   <span id="thinking" class="htmx-indicator">Pensando…</span>
 </form>
+</div>
+</div>
 {{end}}
