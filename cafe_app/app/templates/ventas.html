@@ -28,8 +28,10 @@
 </form>
 
 <h2>Últimas ventas</h2>
+<div class="table">
 <table>
   <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Detalle</th><th>Total</th><th>Cajero</th></tr></thead>
   <tbody id="sales-body">{{range .Data.Sales}}{{template "sale_row" .}}{{end}}</tbody>
 </table>
+</div>
 {{end}}

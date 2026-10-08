@@ -4,23 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} · Cafetería</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js"></script>
 </head>
 <body hx-on::before-request="document.getElementById('error').textContent = ''">
 {{if .User}}
-  <header>
-    <span>☕ Cafetería — Hola, {{.User.Name}}</span>
-    <form method="post" action="/logout"><button class="link">Salir</button></form>
-  </header>
   <div class="shell">
     <nav>
+      <div class="brand">Cafetería</div>
+      <div class="tagline">Desde la barra</div>
       <a href="/inventario" {{if eq .Active "inventario"}}class="active"{{end}}>Inventario</a>
       <a href="/productos" {{if eq .Active "productos"}}class="active"{{end}}>Productos</a>
       <a href="/ventas" {{if eq .Active "ventas"}}class="active"{{end}}>Ventas</a>
       <a href="/clientes" {{if eq .Active "clientes"}}class="active"{{end}}>Clientes</a>
       <a href="/resenas" {{if eq .Active "resenas"}}class="active"{{end}}>Reseñas</a>
-      <a href="/asistente" {{if eq .Active "asistente"}}class="active"{{end}}>🤖 Asistente</a>
+      <a href="/asistente" {{if eq .Active "asistente"}}class="active"{{end}}>Asistente</a>
+      <div class="user">
+        <span>Hola, {{.User.Name}}</span>
+        <form method="post" action="/logout"><button class="link">Salir</button></form>
+      </div>
     </nav>
     <main>
       <h1>{{.Title}}</h1>
@@ -30,7 +35,7 @@
   </div>
 {{else}}
   <main class="login">
-    <h1>☕ Cafetería</h1>
+    <div class="brand">Cafetería</div>
     <p id="error" class="error"></p>
     {{template "content" .}}
   </main>

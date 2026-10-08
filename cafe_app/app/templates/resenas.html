@@ -27,8 +27,10 @@
   <input name="comment" placeholder="Comentario">
   <button>Agregar reseña</button>
 </form>
+<div class="table">
 <table>
   <thead><tr><th>Fecha</th><th>Cliente</th><th>Producto</th><th>Calificación</th><th>Comentario</th></tr></thead>
   <tbody id="reviews-body">{{range .Data.Reviews}}{{template "review_row" .}}{{end}}</tbody>
 </table>
+</div>
 {{end}}
