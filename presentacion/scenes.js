@@ -1,0 +1,778 @@
+// Escenas animadas de cada clase. Lienzo de 1000 × 440.
+// Tipos de nodo: user (persona), agent (agente LLM), model (modelo),
+// code (código Go), ext (otro proceso), store (datos), note (texto).
+
+const N = (id, x, y, label, kind, o = {}) => ({ id, x, y, label, kind, ...o });
+const E = (id, from, to, o = {}) => ({ id, from, to, ...o });
+const G = (id, x, y, w, h, label, o = {}) => ({ id, x, y, w, h, label, ...o });
+
+const SCENES = {
+  // ======================= Módulo 1 =======================
+  mental: {
+    nodes: [
+      N("U", 90, 200, "Usuario", "user", { w: 130 }),
+      N("R", 340, 200, "Runner", "code", { sub: "orquesta el turno" }),
+      N("A", 600, 200, "Agente", "agent", { sub: "llmagent" }),
+      N("M", 870, 200, "Modelo", "model", { sub: "Gemini" }),
+      N("S", 340, 360, "Sesión", "store", { sub: "historial + estado" }),
+    ],
+    edges: [E("uR", "U", "R"), E("rS", "R", "S"), E("rA", "R", "A"), E("aM", "A", "M")],
+    steps: [
+      ["cap", "Le hablas al runner, no al agente"],
+      ["send", "uR", "¿Hay pan de queso?"],
+      ["cap", "El runner trae la sesión…"],
+      ["send", "rS", "historial", { back: true }],
+      ["cap", "…y le da el turno al agente"],
+      ["send", "rA", "contexto"],
+      ["on", "A"],
+      ["send", "aM", "prompt + tools"],
+      ["send", "aM", "respuesta", { back: true }],
+      ["off", "A"],
+      ["cap", "Todo lo que pasa sale como eventos"],
+      ["send", "rA", "evento", { back: true }],
+      ["par", [["send", "rS", "guarda"], ["send", "uR", "evento", { back: true }]]],
+      ["cap", "Agente · Runner · Sesión · Eventos"],
+    ],
+  },
+
+  config: {
+    groups: [G("cfg", 230, 30, 540, 385, "llmagent.Config")],
+    nodes: [
+      N("name", 500, 105, "Name", "agent", { w: 460, sub: '"barista"', hidden: true }),
+      N("desc", 500, 185, "Description", "agent", { w: 460, sub: '"Prepara las bebidas del pedido"', hidden: true }),
+      N("inst", 500, 265, "Instruction", "agent", { w: 460, sub: '"Eres el barista de la cafetería…"', hidden: true }),
+      N("model", 500, 345, "Model", "model", { w: 460, sub: "gemini-3.5-flash-lite", hidden: true }),
+    ],
+    steps: [
+      ["show", "name"], ["cap", "Name: cómo se identifica"],
+      ["show", "desc"], ["flash", "desc"], ["cap", "Description: la leen los demás para decidir si le delegan", 1800],
+      ["show", "inst"], ["cap", "Instruction: cómo se comporta"],
+      ["show", "model"], ["cap", "Model: el cerebro, y se puede cambiar"],
+    ],
+  },
+
+  events: {
+    nodes: [
+      N("A", 130, 220, "Agente", "agent"),
+      N("R", 390, 220, "runner.Run", "code", { sub: "iter.Seq2" }),
+      N("e1", 760, 70, "Evento 1", "store", { w: 280, sub: "llamada a una tool", hidden: true }),
+      N("e2", 760, 165, "Evento 2", "store", { w: 280, sub: "resultado de la tool", hidden: true }),
+      N("e3", 760, 260, "Evento 3", "store", { w: 280, sub: "texto parcial", hidden: true }),
+      N("e4", 760, 355, "Evento 4", "store", { w: 280, sub: "respuesta final", hidden: true }),
+    ],
+    edges: [
+      E("aR", "A", "R"),
+      E("r1", "R", "e1", { hidden: true }), E("r2", "R", "e2", { hidden: true }),
+      E("r3", "R", "e3", { hidden: true }), E("r4", "R", "e4", { hidden: true }),
+    ],
+    steps: [
+      ["cap", "El agente no devuelve una respuesta: emite eventos"],
+      ["send", "aR", ""], ["show", "e1"], ["send", "r1", ""],
+      ["send", "aR", ""], ["show", "e2"], ["send", "r2", ""],
+      ["send", "aR", ""], ["show", "e3"], ["send", "r3", ""],
+      ["send", "aR", ""], ["show", "e4"], ["send", "r4", ""], ["ok", "e4"],
+      ["cap", "Los recorres con un for, a medida que llegan"],
+    ],
+  },
+
+  providers: {
+    nodes: [
+      N("A", 200, 220, "barista", "agent", { sub: "llmagent" }),
+      N("I", 480, 220, "model.LLM", "code", { sub: "interfaz" }),
+      N("G", 820, 100, "Gemini", "model"),
+      N("O", 820, 220, "OpenAI", "model"),
+      N("C", 820, 340, "Anthropic", "model"),
+    ],
+    edges: [E("aI", "A", "I"), E("iG", "I", "G", { dashed: true }), E("iO", "I", "O", { dashed: true }), E("iC", "I", "C", { dashed: true })],
+    steps: [
+      ["cap", "El agente solo conoce una interfaz"],
+      ["send", "aI", "petición"], ["on", "G"], ["send", "iG", ""], ["send", "iG", "", { back: true }], ["off", "G"],
+      ["cap", "Cambias el modelo: el agente sigue igual"],
+      ["send", "aI", "petición"], ["on", "O"], ["send", "iO", ""], ["send", "iO", "", { back: true }], ["off", "O"],
+      ["send", "aI", "petición"], ["on", "C"], ["send", "iC", ""], ["send", "iC", "", { back: true }], ["off", "C"],
+    ],
+  },
+
+  // ======================= Módulo 2 =======================
+  toolLoop: {
+    nodes: [
+      N("U", 100, 230, "Usuario", "user", { w: 130 }),
+      N("A", 400, 230, "Agente", "agent", { sub: "ADK" }),
+      N("M", 740, 100, "Modelo", "model"),
+      N("T", 740, 360, "get_current_time", "code", { w: 200, sub: "tu función Go" }),
+    ],
+    edges: [E("uA", "U", "A"), E("aM", "A", "M"), E("aT", "A", "T")],
+    steps: [
+      ["send", "uA", "¿Qué hora es?"],
+      ["send", "aM", "pregunta + tools"],
+      ["cap", "El modelo no ejecuta nada: pide una llamada"],
+      ["send", "aM", "get_current_time()", { back: true }],
+      ["cap", "El ADK ejecuta tu función"],
+      ["on", "T"], ["send", "aT", "llamada"], ["send", "aT", '"10:42"', { back: true }], ["off", "T"],
+      ["cap", "El resultado vuelve al modelo"],
+      ["send", "aM", "resultado"],
+      ["send", "aM", "Son las 10:42", { back: true }],
+      ["send", "uA", "Son las 10:42", { back: true }],
+      ["cap", "modelo → tool → resultado → modelo"],
+    ],
+  },
+
+  hitl: {
+    nodes: [
+      N("U", 90, 220, "Usuario", "user", { w: 130 }),
+      N("A", 340, 220, "store_agent", "agent"),
+      N("T", 610, 220, "apply_coupon", "code", { sub: "tool Go" }),
+      N("H", 870, 220, "Supervisor", "user", { sub: "esperando…", w: 170 }),
+    ],
+    edges: [E("uA", "U", "A"), E("aT", "A", "T"), E("tH", "T", "H")],
+    steps: [
+      ["send", "uA", "Cupón ESPECIAL-50"],
+      ["send", "aT", "apply_coupon"],
+      ["cap", "Más de 20 %: la tool se detiene"],
+      ["on", "T"],
+      ["send", "tH", "¿Confirmas?"],
+      ["on", "H"], ["cap", "El agente espera tu respuesta"], ["wait", 900],
+      ["text", "H", "Supervisor", "✓ Sí"], ["ok", "H"],
+      ["send", "tH", "confirmado", { back: true }],
+      ["cap", "Con el sí, la tool se ejecuta"], ["ok", "T"],
+      ["send", "aT", "cupón aplicado", { back: true }],
+      ["send", "uA", "50 % aplicado", { back: true }],
+    ],
+  },
+
+  hitlPayload: {
+    nodes: [
+      N("U", 90, 220, "Usuario", "user", { w: 130 }),
+      N("A", 340, 220, "store_agent", "agent"),
+      N("T", 610, 220, "apply_coupon", "code", { sub: "tool Go" }),
+      N("H", 870, 220, "Supervisor", "user", { sub: "descuento: —", w: 180 }),
+    ],
+    edges: [E("uA", "U", "A"), E("aT", "A", "T"), E("tH", "T", "H")],
+    steps: [
+      ["send", "uA", "Cupón ESPECIAL-50"],
+      ["send", "aT", "apply_coupon"],
+      ["on", "T"],
+      ["send", "tH", "{discount: 50}"],
+      ["text", "H", "Supervisor", "descuento: 50 %"], ["on", "H"],
+      ["cap", "La persona no solo aprueba…"], ["wait", 600],
+      ["text", "H", "Supervisor", "descuento: 30 %"],
+      ["cap", "…cambia el valor antes de ejecutar"],
+      ["ok", "H"],
+      ["send", "tH", "{discount: 30}", { back: true }],
+      ["ok", "T"],
+      ["send", "aT", "30 % aplicado", { back: true }],
+      ["send", "uA", "30 % aplicado", { back: true }],
+    ],
+  },
+
+  mcp: {
+    nodes: [
+      N("A", 130, 170, "Agente", "agent"),
+      N("L", 130, 330, "Tools del agente", "store", { sub: "propias + MCP", w: 190, hidden: true }),
+      N("TS", 420, 170, "mcptoolset", "code", { sub: "cliente MCP" }),
+      N("S1", 800, 80, "Servidor local", "ext", { sub: "stdio", w: 200 }),
+      N("S2", 800, 210, "Servidor remoto", "ext", { sub: "HTTP + token", w: 200 }),
+      N("S3", 800, 340, "Servidor remoto", "ext", { sub: "HTTP + login", w: 200 }),
+    ],
+    edges: [
+      E("aT", "A", "TS"), E("t1", "TS", "S1"), E("t2", "TS", "S2"), E("t3", "TS", "S3"),
+      E("aL", "A", "L", { dashed: true, hidden: true }),
+    ],
+    steps: [
+      ["cap", "El toolset pregunta qué herramientas hay"],
+      ["par", [["send", "t1", "tools/list"], ["send", "t2", "tools/list"], ["send", "t3", "tools/list"]]],
+      ["par", [["send", "t1", "", { back: true }], ["send", "t2", "", { back: true }], ["send", "t3", "", { back: true }]]],
+      ["send", "aT", "tools", { back: true }],
+      ["show", ["L", "aL"]], ["flash", "L"],
+      ["cap", "Aparecen junto a las tuyas"],
+      ["send", "aT", "tools/call"],
+      ["send", "t2", "tools/call"],
+      ["send", "t2", "resultado", { back: true }],
+      ["send", "aT", "resultado", { back: true }],
+      ["cap", "Para el modelo, una tool es una tool"],
+    ],
+  },
+
+  // ======================= Módulo 3 =======================
+  whichOne: {
+    nodes: [
+      N("T", 180, 150, "Tool", "code", { w: 240, h: 90, sub: "código que el agente ejecuta", hidden: true }),
+      N("M", 500, 150, "MCP", "ext", { w: 240, h: 90, sub: "tools de otro proceso", hidden: true }),
+      N("S", 820, 150, "Skill", "agent", { w: 240, h: 90, sub: "instrucciones que lee\ncuando las necesita", hidden: true }),
+      N("t", 180, 320, "get_current_time", "note", { w: 220, hidden: true }),
+      N("m", 500, 320, "el servidor de la app", "note", { w: 220, hidden: true }),
+      N("s", 820, 320, "reporte-ejecutivo", "note", { w: 220, hidden: true }),
+    ],
+    edges: [E("tt", "T", "t", { dashed: true, hidden: true }), E("mm", "M", "m", { dashed: true, hidden: true }), E("ss", "S", "s", { dashed: true, hidden: true })],
+    steps: [
+      ["show", ["T", "tt", "t"]], ["cap", "Tool: hace algo"],
+      ["show", ["M", "mm", "m"]], ["cap", "MCP: hace algo, pero vive en otro lado"],
+      ["show", ["S", "ss", "s"]], ["cap", "Skill: sabe cómo hacerlo"],
+    ],
+  },
+
+  progressive: {
+    groups: [G("ctx", 40, 50, 300, 350, "Contexto del modelo"), G("dir", 560, 50, 400, 350, "skills/reporte-ejecutivo/")],
+    nodes: [
+      N("p1", 190, 130, "name + description", "store", { w: 240, hidden: true }),
+      N("p2", 190, 225, "instrucciones", "store", { w: 240, hidden: true }),
+      N("p3", 190, 320, "PLANTILLA.md", "store", { w: 240, hidden: true }),
+      N("f1", 760, 130, "Frontmatter", "agent", { w: 320, sub: "name + description" }),
+      N("f2", 760, 225, "SKILL.md", "agent", { w: 320, sub: "las instrucciones" }),
+      N("f3", 760, 320, "Recursos", "agent", { w: 320, sub: "references/ assets/ scripts/" }),
+    ],
+    edges: [E("e1", "f1", "p1"), E("e2", "f2", "p2"), E("e3", "f3", "p3")],
+    steps: [
+      ["cap", "Al inicio solo viaja el nombre y la descripción"],
+      ["send", "e1", "siempre"], ["show", "p1"],
+      ["cap", "Si la pregunta lo necesita: load_skill"],
+      ["send", "e2", "load_skill"], ["show", "p2"],
+      ["cap", "Y solo si hace falta: load_skill_resource"],
+      ["send", "e3", "load_skill_resource"], ["show", "p3"],
+      ["cap", "El contexto crece solo cuando hace falta"],
+    ],
+  },
+
+  reload: {
+    groups: [G("dir", 720, 70, 250, 300, "skills/")],
+    nodes: [
+      N("U", 90, 220, "Usuario", "user", { w: 130 }),
+      N("A", 320, 220, "Agente", "agent"),
+      N("FS", 560, 220, "FileSystemSource", "code", { w: 190, sub: "lee el disco" }),
+      N("d1", 845, 160, "carta-de-cafes", "store", { w: 200 }),
+      N("d2", 845, 280, "maridaje", "store", { w: 200, hidden: true }),
+    ],
+    edges: [E("uA", "U", "A"), E("aF", "A", "FS"), E("f1", "FS", "d1"), E("f2", "FS", "d2", { hidden: true })],
+    steps: [
+      ["cap", "Antes de cada llamada al modelo, el agente pide la lista"],
+      ["send", "uA", "mensaje 1"],
+      ["send", "aF", "ListFrontmatters"],
+      ["send", "f1", "lee"],
+      ["send", "aF", "[carta]", { back: true }],
+      ["cap", "Con el agente andando: cp -r nuevas/maridaje skills/", 1600],
+      ["show", ["d2", "f2"]], ["flash", "d2"],
+      ["send", "uA", "mensaje 2"],
+      ["send", "aF", "ListFrontmatters"],
+      ["par", [["send", "f1", "lee"], ["send", "f2", "lee"]]],
+      ["send", "aF", "[carta, maridaje]", { back: true }],
+      ["ok", "d2"],
+      ["cap", "Sin reiniciar: la skill nueva ya está"],
+    ],
+  },
+
+  state: {
+    nodes: [
+      N("U", 90, 220, "Usuario", "user", { w: 130 }),
+      N("A", 360, 220, "Agente", "agent"),
+      N("T", 680, 100, "save_favorite_drink", "code", { w: 220 }),
+      N("S", 680, 340, "Estado de la sesión", "store", { w: 320, sub: "(vacío)" }),
+    ],
+    edges: [E("uA", "U", "A"), E("aT", "A", "T"), E("tS", "T", "S"), E("aS", "A", "S", { dashed: true })],
+    steps: [
+      ["send", "uA", "Mi favorita es el latte"],
+      ["send", "aT", "latte"],
+      ["send", "tS", "guarda"],
+      ["text", "S", "Estado de la sesión", "user:favorite_drink = latte"],
+      ["cap", "La tool guarda el dato en el estado"],
+      ["send", "uA", "¡Anotado!", { back: true }],
+      ["cap", "Más tarde, en la misma conversación…"],
+      ["send", "uA", "Lo de siempre"],
+      ["send", "aS", "{user:favorite_drink}", { back: true }],
+      ["send", "uA", "Un latte, ¿cierto?", { back: true }],
+      ["cap", "El agente lo lee del estado, no de su memoria"],
+    ],
+  },
+
+  sqlite: {
+    nodes: [
+      N("A", 150, 220, "Agente", "agent"),
+      N("SS", 470, 220, "SessionService", "code", { w: 190, sub: "session/database" }),
+      N("DB", 800, 220, "sessions.db", "store", { sub: "SQLite" }),
+    ],
+    edges: [E("aS", "A", "SS"), E("sD", "SS", "DB")],
+    steps: [
+      ["send", "aS", "evento"],
+      ["send", "sD", "INSERT"],
+      ["cap", "Cada evento queda en SQLite"],
+      ["cap", "Reinicias el programa…"],
+      ["dim", ["A", "SS", "aS", "sD"]], ["wait", 900],
+      ["undim", ["A", "SS", "aS", "sD"]],
+      ["send", "sD", "historial", { back: true }],
+      ["send", "aS", "historial", { back: true }],
+      ["ok", "A"],
+      ["cap", "…y la conversación sigue donde estaba"],
+    ],
+  },
+
+  output: {
+    nodes: [
+      N("U", 90, 200, "Reseña", "user", { w: 130 }),
+      N("A", 330, 200, "review_agent", "agent", { sub: "OutputSchema" }),
+      N("J", 610, 200, "JSON", "code", { w: 240, h: 108, sub: 'sentiment: "negativo"\nrating: 2\nsummary: "llegó frío"', hidden: true }),
+      N("S", 880, 200, "state[\"review\"]", "store", { w: 170, sub: "OutputKey" }),
+      N("X", 610, 380, "Otro agente o tu código", "note", { w: 260, hidden: true }),
+    ],
+    edges: [E("uA", "U", "A"), E("aJ", "A", "J", { hidden: true }), E("jS", "J", "S", { hidden: true }), E("sX", "S", "X", { dashed: true, hidden: true })],
+    steps: [
+      ["send", "uA", '"El latte llegó frío"'],
+      ["on", "A"],
+      ["cap", "La respuesta sigue un esquema"],
+      ["show", ["aJ", "J"]], ["off", "A"],
+      ["cap", "OutputKey la guarda en el estado"],
+      ["send", "jS", "review"],
+      ["ok", "S"],
+      ["show", ["sX", "X"]],
+      ["send", "sX", "{review}"],
+      ["cap", "Y el siguiente paso la puede leer"],
+    ],
+  },
+
+  // ======================= Módulo 4 =======================
+  patterns: {
+    nodes: [
+      N("p1", 85, 170, "ModeChat", "agent", { w: 105, hidden: true }),
+      N("p2", 205, 170, "ModeTask", "agent", { w: 105, hidden: true }),
+      N("p3", 325, 170, "SingleTurn", "agent", { w: 105, hidden: true }),
+      N("p4", 445, 170, "Secuencial", "code", { w: 105, hidden: true }),
+      N("p5", 565, 170, "Paralelo", "code", { w: 105, hidden: true }),
+      N("p6", 685, 170, "Bucle", "code", { w: 105, hidden: true }),
+      N("p7", 805, 170, "Grafo", "code", { w: 105, hidden: true }),
+      N("p8", 925, 170, "Dinámico", "code", { w: 105, hidden: true }),
+      N("L", 150, 300, "El modelo decide", "note", { w: 200 }),
+      N("R", 850, 300, "El código decide", "note", { w: 200 }),
+      N("A2A", 500, 395, "A2A: cualquiera puede vivir en otro proceso", "ext", { w: 420, hidden: true }),
+    ],
+    edges: [E("lr", "L", "R")],
+    steps: [
+      ["show", ["p1", "p2", "p3"]], ["cap", "Sub-agentes: el LLM elige a quién delegar"],
+      ["show", ["p4", "p5", "p6"]], ["cap", "Workflows: el orden lo fija el código"],
+      ["show", ["p7", "p8"]], ["cap", "Grafos y nodos dinámicos: rutas y bucles en Go"],
+      ["show", "A2A"], ["cap", "Y A2A conecta agentes de distintos procesos"],
+    ],
+  },
+
+  delegation: {
+    nodes: [
+      N("U", 90, 220, "Usuario", "user", { w: 130 }),
+      N("H", 380, 220, "coffee_host", "agent", { sub: "coordinador" }),
+      N("B", 760, 110, "barista", "agent", { sub: "ModeChat" }),
+      N("R", 760, 330, "review_agent", "agent", { sub: "ModeChat" }),
+    ],
+    edges: [
+      E("uH", "U", "H"), E("hB", "H", "B", { label: "transfer_to_agent" }), E("hR", "H", "R"),
+      E("uB", "U", "B", { bend: -70, hidden: true }),
+    ],
+    steps: [
+      ["send", "uH", "Quiero un capuchino"],
+      ["on", "H"], ["cap", "El coordinador lee las descripciones y elige"],
+      ["send", "hB", ""], ["off", "H"], ["on", "B"],
+      ["cap", "El barista se queda con la conversación"],
+      ["dim", ["H", "uH"]], ["show", "uB"],
+      ["send", "uB", "¿Con leche de avena?", { back: true }],
+      ["send", "uB", "Sí, por favor"],
+      ["send", "uB", "¡Listo!", { back: true }],
+    ],
+  },
+
+  modes: {
+    nodes: [
+      N("U", 90, 220, "Usuario", "user", { w: 130 }),
+      N("H", 400, 220, "coffee_host", "agent", { sub: "coordinador" }),
+      N("T", 780, 100, "loyalty_signup", "agent", { w: 190, sub: "ModeTask" }),
+      N("S", 780, 340, "review_classifier", "agent", { w: 190, sub: "ModeSingleTurn" }),
+    ],
+    edges: [E("uH", "U", "H"), E("hT", "H", "T"), E("hS", "H", "S"), E("uT", "U", "T", { bend: -60, hidden: true })],
+    steps: [
+      ["cap", "ModeTask: conversa con el usuario y devuelve datos"],
+      ["send", "uH", "Quiero inscribirme"],
+      ["send", "hT", "tarea"], ["on", "T"], ["show", "uT"],
+      ["send", "uT", "¿Tu nombre?", { back: true }],
+      ["send", "uT", "Ana"],
+      ["hide", "uT"],
+      ["send", "hT", '{name: "Ana"}', { back: true }], ["off", "T"],
+      ["cap", "El control vuelve al coordinador"],
+      ["send", "uH", "¡Bienvenida, Ana!", { back: true }],
+      ["cap", "ModeSingleTurn: hace su trabajo y vuelve, sin hablar con nadie", 1500],
+      ["send", "uH", "El café llegó frío"],
+      ["send", "hS", "clasifica"], ["on", "S"],
+      ["send", "hS", '"negativo"', { back: true }], ["off", "S"],
+      ["send", "uH", "Lo sentimos mucho…", { back: true }],
+    ],
+  },
+
+  sequential: {
+    groups: [G("pipe", 170, 70, 800, 230, "invoice_pipeline · sequentialagent")],
+    nodes: [
+      N("U", 75, 185, "Factura", "user", { w: 110 }),
+      N("R", 310, 185, "invoice_reader", "agent", { w: 180 }),
+      N("C", 570, 185, "item_categorizer", "agent", { w: 180 }),
+      N("W", 830, 185, "report_writer", "agent", { w: 180 }),
+      N("S", 570, 380, "Estado", "store", { w: 380, sub: "(vacío)" }),
+    ],
+    edges: [E("uR", "U", "R"), E("rC", "R", "C"), E("cW", "C", "W"), E("rS", "R", "S", { dashed: true }), E("cS", "C", "S", { dashed: true })],
+    steps: [
+      ["send", "uR", "PDF"],
+      ["on", "R"], ["send", "rS", "invoice_items"], ["text", "S", "Estado", "invoice_items"], ["ok", "R"],
+      ["send", "rC", "paso 2"],
+      ["on", "C"], ["send", "cS", "categories"], ["text", "S", "Estado", "invoice_items · categories"], ["ok", "C"],
+      ["send", "cW", "paso 3"],
+      ["on", "W"], ["wait", 500], ["ok", "W"],
+      ["cap", "Siempre el mismo orden: lo decide el código"],
+      ["cap", "Cada paso deja su resultado en el estado"],
+    ],
+  },
+
+  parallel: {
+    groups: [G("par", 230, 40, 320, 360, "drink_analysis · parallelagent")],
+    nodes: [
+      N("U", 90, 220, "Bebida nueva", "user", { w: 140 }),
+      N("A", 390, 110, "allergen_checker", "agent", { w: 190 }),
+      N("B", 390, 220, "price_estimator", "agent", { w: 190 }),
+      N("C", 390, 330, "slogan_writer", "agent", { w: 190 }),
+      N("W", 720, 220, "launch_sheet_writer", "agent", { w: 210 }),
+      N("O", 915, 220, "Ficha", "store", { w: 110 }),
+    ],
+    edges: [
+      E("uA", "U", "A"), E("uB", "U", "B"), E("uC", "U", "C"),
+      E("aW", "A", "W"), E("bW", "B", "W"), E("cW", "C", "W"), E("wO", "W", "O"),
+    ],
+    steps: [
+      ["cap", "Tres especialistas al mismo tiempo"],
+      ["par", [["send", "uA", ""], ["send", "uB", ""], ["send", "uC", ""]]],
+      ["on", ["A", "B", "C"]], ["wait", 700],
+      ["ok", "B"], ["wait", 300], ["ok", "A"], ["wait", 400], ["ok", "C"],
+      ["cap", "El paso siguiente espera a los tres"],
+      ["par", [["send", "aW", "allergens"], ["send", "bW", "price"], ["send", "cW", "slogan"]]],
+      ["on", "W"], ["send", "wO", "ficha"], ["ok", "W"],
+      ["cap", "Si no dependen entre sí, no tienen por qué esperar"],
+    ],
+  },
+
+  loop: {
+    groups: [G("lp", 230, 70, 520, 300, "combo_loop · loopagent · máx. 4 vueltas")],
+    nodes: [
+      N("U", 105, 220, "Usuario", "user", { w: 190, sub: "4 personas · $50.000" }),
+      N("P", 370, 220, "combo_planner", "agent", { w: 180 }),
+      N("C", 620, 220, "cashier", "agent"),
+      N("T", 880, 220, "check_combo", "code", { sub: "precios reales" }),
+    ],
+    edges: [E("uP", "U", "P"), E("pC", "P", "C", { bend: -50 }), E("cP", "C", "P", { bend: -50 }), E("cT", "C", "T")],
+    steps: [
+      ["send", "uP", "combo"],
+      ["on", "P"], ["send", "pC", "combo v1"], ["off", "P"],
+      ["send", "cT", "verifica"],
+      ["send", "cT", "$62.000", { back: true }],
+      ["bad", "T"], ["cap", "Se pasó: el cashier devuelve la corrección"],
+      ["send", "cP", "sobran $12.000"], ["clear", "T"],
+      ["on", "P"], ["send", "pC", "combo v2"], ["off", "P"],
+      ["send", "cT", "verifica"],
+      ["send", "cT", "$48.000 ✓", { back: true }],
+      ["text", "T", "check_combo", "Escalate = true"], ["ok", "T"],
+      ["cap", "La tool, no el LLM, decide cuándo salir del bucle", 1600],
+      ["ok", "lp"],
+    ],
+  },
+
+  graph: {
+    nodes: [
+      N("S", 60, 220, "Start", "note", { w: 80 }),
+      N("C", 230, 220, "review_classifier", "agent", { w: 190 }),
+      N("R", 450, 220, "router", "code", { w: 120, h: 60, shape: "diamond" }),
+      N("T", 720, 90, "thanks_writer", "agent", { w: 180 }),
+      N("K", 680, 220, "create_ticket", "code", { w: 160 }),
+      N("A", 890, 220, "apology_writer", "agent", { w: 170 }),
+      N("I", 720, 360, "improvement_question", "code", { w: 220 }),
+    ],
+    edges: [
+      E("sC", "S", "C"), E("cR", "C", "R"),
+      E("rT", "R", "T", { label: "positivo" }), E("rK", "R", "K", { label: "negativo" }),
+      E("kA", "K", "A"), E("rI", "R", "I", { label: "Default" }),
+    ],
+    steps: [
+      ["send", "sC", '"Llegó frío"'],
+      ["on", "C"], ["send", "cR", '"negativo"'], ["off", "C"],
+      ["on", "R"], ["cap", "El router, en Go, elige la ruta"],
+      ["send", "rK", ""], ["off", "R"],
+      ["on", "K"], ["text", "K", "create_ticket", "TCK-4821"],
+      ["send", "kA", "ticket"], ["ok", "A"],
+      ["cap", "LLM y código mezclados en un mismo grafo"],
+      ["dim", ["K", "A", "rK", "kA"]],
+      ["send", "sC", '"¡Delicioso!"'],
+      ["send", "cR", '"positivo"'],
+      ["send", "rT", ""], ["ok", "T"],
+      ["cap", "Otra reseña, otro camino"],
+    ],
+  },
+
+  dynamic: {
+    nodes: [
+      N("U", 95, 220, "Usuario", "user", { w: 150, sub: "2 lattes y 1 chai" }),
+      N("W", 400, 220, "order_workflow", "code", { w: 190, sub: "nodo dinámico Go" }),
+      N("P", 760, 100, "order_parser", "agent", { w: 180 }),
+      N("B", 760, 340, "barista", "agent", { sub: "llamadas: 0" }),
+    ],
+    edges: [E("uW", "U", "W"), E("wP", "W", "P", { dashed: true, label: "RunNode" }), E("wB", "W", "B", { dashed: true, label: "RunNode" })],
+    steps: [
+      ["send", "uW", "pedido"],
+      ["send", "wP", ""], ["send", "wP", "[latte, latte, chai]", { back: true }],
+      ["cap", "El código decide cuántas veces llamar al agente"],
+      ["send", "wB", "latte"], ["text", "B", "barista", "llamadas: 1"], ["send", "wB", "", { back: true }],
+      ["send", "wB", "latte"], ["text", "B", "barista", "llamadas: 2"], ["send", "wB", "", { back: true }],
+      ["send", "wB", "chai"], ["text", "B", "barista", "llamadas: 3"], ["send", "wB", "", { back: true }],
+      ["send", "uW", "3 bebidas listas", { back: true }],
+      ["cap", "Un for en Go, no un grafo fijo"],
+    ],
+  },
+
+  a2a: {
+    groups: [G("p1", 30, 70, 440, 300, "Proceso 1 · cafetería"), G("p2", 540, 70, 430, 300, "Proceso 2 · panadería La Espiga")],
+    nodes: [
+      N("H", 150, 220, "coffee_host", "agent"),
+      N("RA", 370, 220, "remoteagent", "code", { sub: "A2A" }),
+      N("CARD", 755, 150, "Agent card", "store", { w: 320, sub: "/.well-known/agent-card.json" }),
+      N("BK", 755, 290, "bakery", "agent", { sub: "web a2a" }),
+    ],
+    edges: [E("hR", "H", "RA"), E("rC", "RA", "CARD"), E("rB", "RA", "BK")],
+    steps: [
+      ["cap", "Primero lee la agent card: quién es y qué sabe hacer"],
+      ["send", "rC", "GET"], ["send", "rC", "card", { back: true }],
+      ["cap", "Después le habla como a un sub-agente más"],
+      ["send", "hR", "20 panes de queso"],
+      ["send", "rB", "message/send"],
+      ["on", "BK"], ["wait", 500],
+      ["send", "rB", "pedido #1001", { back: true }], ["ok", "BK"],
+      ["send", "hR", "pedido #1001", { back: true }],
+      ["cap", "Otro proceso, otro servidor, incluso otra empresa"],
+    ],
+  },
+
+  claude: {
+    groups: [G("p1", 30, 70, 300, 300, "Proceso 1"), G("p2", 400, 70, 570, 300, "Proceso 2 · A2A")],
+    nodes: [
+      N("D", 180, 220, "dev_assistant", "agent", { sub: "Gemini" }),
+      N("CC", 540, 220, "claude_code", "code", { sub: "agente propio en Go" }),
+      N("CLI", 830, 150, "claude -p", "ext", { sub: "solo lectura" }),
+      N("RP", 830, 300, "Repositorio", "store", { sub: "Read · Grep · Glob" }),
+    ],
+    edges: [E("dC", "D", "CC"), E("cL", "CC", "CLI"), E("lR", "CLI", "RP")],
+    steps: [
+      ["send", "dC", "¿Dónde está el MCP?"],
+      ["send", "cL", "ejecuta"],
+      ["send", "lR", "busca"], ["send", "lR", "", { back: true }],
+      ["send", "cL", "respuesta", { back: true }],
+      ["send", "dC", "cafe_app/mcp", { back: true }],
+      ["cap", "Si lo envuelves en un agente, cualquier programa habla A2A"],
+    ],
+  },
+
+  // ======================= Módulo 5 =======================
+  arch: {
+    nodes: [
+      N("N", 80, 220, "Navegador", "user", { w: 130 }),
+      N("APP", 300, 220, "app", "code", { sub: "htmx · API · SQLite" }),
+      N("AG", 560, 220, "agents", "agent", { sub: "coordinador + equipo" }),
+      N("MCP", 830, 90, "mcp", "ext", { sub: "con token" }),
+      N("BK", 830, 350, "bakery", "agent", { sub: "A2A" }),
+    ],
+    edges: [
+      E("nA", "N", "APP"), E("aG", "APP", "AG"),
+      E("gM", "AG", "MCP"), E("mA", "MCP", "APP", { bend: 90 }),
+      E("gA", "AG", "APP", { bend: -70, label: "tools Go" }), E("gB", "AG", "BK"),
+    ],
+    steps: [
+      ["send", "nA", "chat"],
+      ["cap", "El navegador nunca habla directo con los agentes"],
+      ["send", "aG", "reenvía"],
+      ["on", "AG"], ["cap", "Leen por MCP…"],
+      ["send", "gM", "list_menu"], ["send", "mA", "API"],
+      ["cap", "…escriben con tools Go…"],
+      ["send", "gA", "register_sale"],
+      ["cap", "…y le piden pan a otra empresa por A2A"],
+      ["send", "gB", "pedido"],
+      ["off", "AG"],
+    ],
+  },
+
+  barista: {
+    nodes: [
+      N("U", 80, 220, "Cliente", "user", { w: 120 }),
+      N("C", 290, 220, "coordinador", "agent"),
+      N("B", 520, 220, "barista", "agent", { sub: "ModeTask" }),
+      N("M", 810, 75, "MCP", "ext", { sub: "list_menu · get_stock", w: 210 }),
+      N("T", 810, 220, "register_sale", "code", { sub: "tool Go", w: 210 }),
+      N("K", 810, 365, "Tarjeta", "user", { sub: "Aprobar · Rechazar", w: 210 }),
+    ],
+    edges: [E("uC", "U", "C"), E("cB", "C", "B"), E("bM", "B", "M"), E("bT", "B", "T"), E("tK", "T", "K"), E("uB", "U", "B", { bend: -80, hidden: true })],
+    steps: [
+      ["send", "uC", "2 lattes"],
+      ["send", "cB", "tarea"], ["on", "B"], ["show", "uB"],
+      ["send", "bM", "list_menu"], ["send", "bM", "menú", { back: true }],
+      ["send", "uB", "¿A nombre de quién?", { back: true }],
+      ["send", "uB", "Marta"],
+      ["send", "bT", "register_sale"],
+      ["cap", "El código exige la aprobación, no el prompt"],
+      ["send", "tK", "total $17.000"], ["on", "K"], ["wait", 700],
+      ["text", "K", "Tarjeta", "✓ Aprobada"], ["ok", "K"],
+      ["send", "tK", "", { back: true }],
+      ["text", "T", "register_sale", "venta #12"], ["ok", "T"],
+      ["send", "bT", "venta #12", { back: true }],
+    ],
+  },
+
+  limits: {
+    nodes: [
+      N("H", 500, 80, "coordinador", "agent"),
+      N("B", 230, 250, "barista", "agent"),
+      N("A", 500, 250, "administrador", "agent"),
+      N("R", 770, 250, "reseñas", "agent"),
+      N("T", 230, 385, "list_menu · get_stock", "ext", { w: 230, sub: "2 de las 7 tools del MCP", hidden: true }),
+    ],
+    edges: [
+      E("hB", "H", "B"), E("hA", "H", "A"), E("hR", "H", "R"),
+      E("bA", "B", "A", { dashed: true, hidden: true }),
+      E("bT", "B", "T", { hidden: true }),
+    ],
+    steps: [
+      ["send", "hB", "pedido"], ["on", "B"],
+      ["cap", "DisallowTransferToPeers: no salta a otro especialista"],
+      ["show", "bA"], ["send", "bA", "transfer?"], ["bad", "bA"],
+      ["cap", "FilterToolset: solo ve las tools que necesita"],
+      ["show", ["T", "bT"]], ["flash", "T"],
+      ["cap", "Menos opciones, menos errores"],
+    ],
+  },
+
+  analyst: {
+    groups: [G("par", 420, 50, 260, 340, "en paralelo")],
+    nodes: [
+      N("H", 95, 220, "coordinador", "agent", { w: 150 }),
+      N("D", 290, 220, "daily_report", "code", { w: 160, sub: "agenttool" }),
+      N("S1", 550, 120, "ventas", "agent", { w: 150 }),
+      N("S2", 550, 220, "inventario", "agent", { w: 150 }),
+      N("S3", 550, 320, "reseñas", "agent", { w: 150 }),
+      N("W", 850, 220, "report_writer", "agent", { w: 210, sub: "skill + OutputSchema" }),
+    ],
+    edges: [
+      E("hD", "H", "D"),
+      E("d1", "D", "S1"), E("d2", "D", "S2"), E("d3", "D", "S3"),
+      E("w1", "S1", "W"), E("w2", "S2", "W"), E("w3", "S3", "W"),
+    ],
+    steps: [
+      ["send", "hD", "reporte de hoy"],
+      ["par", [["send", "d1", ""], ["send", "d2", ""], ["send", "d3", ""]]],
+      ["on", ["S1", "S2", "S3"]], ["wait", 600], ["ok", ["S1", "S2", "S3"]],
+      ["cap", "Paralelo para leer, secuencial para redactar"],
+      ["par", [["send", "w1", ""], ["send", "w2", ""], ["send", "w3", ""]]],
+      ["on", "W"], ["wait", 500], ["text", "W", "report_writer", "JSON del reporte"], ["ok", "W"],
+      ["send", "hD", "reporte", { back: true }],
+      ["cap", "Todo el equipo, envuelto en una sola tool"],
+    ],
+  },
+
+  flows: {
+    nodes: [
+      N("S", 70, 220, "Petición", "user", { w: 110 }),
+      N("C", 240, 220, "request_classifier", "agent", { w: 190 }),
+      N("R", 430, 220, "router", "code", { w: 110, h: 60, shape: "diamond" }),
+      N("CB", 650, 90, "combo_builder", "code", { w: 180, sub: "combo base en Go" }),
+      N("UL", 880, 90, "upsell_loop", "agent", { w: 170, sub: "planner ⇄ checker" }),
+      N("Q", 650, 220, "consulta", "agent", { w: 180, sub: "MCP de lectura" }),
+      N("O", 650, 350, "otro", "code", { w: 180, sub: "ayuda fija" }),
+      N("CR", 880, 250, "combo_result", "code", { w: 170 }),
+    ],
+    edges: [
+      E("sC", "S", "C"), E("cR", "C", "R"),
+      E("rCB", "R", "CB", { label: "combo" }), E("rQ", "R", "Q"), E("rO", "R", "O"),
+      E("bU", "CB", "UL"), E("uR", "UL", "CR"),
+    ],
+    steps: [
+      ["send", "sC", "combo para 4 con $60.000"],
+      ["on", "C"], ["send", "cR", '"combo"'], ["off", "C"],
+      ["send", "rCB", ""], ["on", "CB"],
+      ["cap", "El código calcula el combo base: rápido y predecible"],
+      ["text", "CB", "combo_builder", "base: $46.000"], ["ok", "CB"],
+      ["send", "bU", "margen $14.000"], ["on", "UL"],
+      ["cap", "El LLM solo propone la mejora, y el código la verifica"],
+      ["wait", 600], ["ok", "UL"],
+      ["send", "uR", "mejora ✓"], ["ok", "CR"],
+      ["cap", "El modelo entiende, el código calcula"],
+    ],
+  },
+
+  memory: {
+    groups: [
+      G("app", 60, 30, 880, 380, "app: · todo el equipo", { hidden: true }),
+      G("user", 110, 100, 780, 300, "user: · cada usuario", { hidden: true }),
+      G("ses", 160, 170, 680, 220, "sesión · una conversación", { hidden: true }),
+      G("tmp", 210, 240, 580, 140, "temp: · un solo turno", { hidden: true }),
+    ],
+    nodes: [
+      N("v1", 690, 65, 'app:avisos = "hoy no hay pan de queso"', "store", { w: 380, h: 36, hidden: true }),
+      N("v2", 670, 135, 'user:preferencias = "respuestas cortas"', "store", { w: 360, h: 36, hidden: true }),
+      N("v3", 660, 205, 'customer_name = "Marta"', "store", { w: 280, h: 36, hidden: true }),
+      N("v4", 500, 320, "temp:combo_params", "store", { w: 260, h: 36, hidden: true }),
+    ],
+    steps: [
+      ["show", ["app", "v1"]], ["cap", "app: lo ve todo el equipo"],
+      ["show", ["user", "v2"]], ["cap", "user: lo ve el mismo usuario en todas sus conversaciones", 1600],
+      ["show", ["ses", "v3"]], ["cap", "Sin prefijo: solo esta conversación"],
+      ["show", ["tmp", "v4"]], ["cap", "temp: se borra al terminar el turno"],
+    ],
+  },
+
+  restock: {
+    nodes: [
+      N("AD", 110, 200, "administrador", "agent", { w: 160 }),
+      N("T", 360, 200, "order_bread", "code", { sub: "tool Go" }),
+      N("K", 360, 370, "Tarjeta", "user", { w: 210, sub: "pan de queso × 20" }),
+      N("BK", 640, 200, "bakery", "agent", { sub: "A2A" }),
+      N("INV", 880, 200, "Inventario", "store", { w: 190, sub: "pan de queso: 3" }),
+    ],
+    edges: [E("aT", "AD", "T"), E("tK", "T", "K"), E("tB", "T", "BK"), E("tI", "T", "INV", { bend: -110 })],
+    steps: [
+      ["send", "aT", "falta pan de queso"],
+      ["send", "tK", "¿Pedir 20?"], ["on", "K"],
+      ["cap", "La cantidad se puede cambiar antes de aprobar"],
+      ["text", "K", "Tarjeta", "pan de queso × 30"], ["ok", "K"],
+      ["send", "tK", "aprobado: 30", { back: true }],
+      ["cap", "Solo después de aprobar habla con la panadería"],
+      ["send", "tB", "pedido: 30"], ["on", "BK"],
+      ["send", "tB", "{order: 1001, qty: 30}", { back: true }], ["ok", "BK"],
+      ["send", "tI", "+30"],
+      ["text", "INV", "Inventario", "pan de queso: 33"], ["ok", "INV"],
+      ["cap", "El inventario sube cuando la panadería confirma"],
+    ],
+  },
+
+  deploy: {
+    groups: [G("net", 200, 30, 770, 390, "red interna · compose")],
+    nodes: [
+      N("N", 85, 200, "Navegador", "user", { w: 130 }),
+      N("APP", 340, 200, "app", "code", { sub: ":8080 (único puerto)", hidden: true }),
+      N("V1", 340, 360, "app-data", "store", { sub: "cafe.db", hidden: true }),
+      N("AG", 600, 110, "agents", "agent", { hidden: true }),
+      N("MCP", 600, 230, "mcp", "ext", { hidden: true }),
+      N("BK", 600, 350, "bakery", "agent", { hidden: true }),
+      N("V2", 850, 110, "agents-data", "store", { sub: "sessions.db", hidden: true }),
+    ],
+    edges: [
+      E("nA", "N", "APP", { hidden: true }), E("aG", "APP", "AG", { hidden: true }),
+      E("gM", "AG", "MCP", { hidden: true }), E("gB", "AG", "BK", { bend: -210, hidden: true }),
+      E("mA", "MCP", "APP", { hidden: true }),
+      E("a1", "APP", "V1", { dashed: true, hidden: true }), E("g2", "AG", "V2", { dashed: true, hidden: true }),
+    ],
+    steps: [
+      ["cap", "Un solo comando: podman compose up -d"],
+      ["par", [["show", ["APP", "AG", "MCP", "BK"]]]],
+      ["show", ["aG", "gM", "gB", "mA"]],
+      ["cap", "Solo la app publica un puerto"],
+      ["show", "nA"], ["send", "nA", "http"],
+      ["send", "aG", ""], ["send", "gM", ""], ["send", "mA", ""],
+      ["cap", "Los datos viven en volúmenes"],
+      ["show", ["V1", "V2", "a1", "g2"]], ["flash", ["V1", "V2"]],
+      ["cap", "down y up: las ventas y las conversaciones siguen ahí"],
+    ],
+  },
+};
+
+window.SCENES = SCENES;
