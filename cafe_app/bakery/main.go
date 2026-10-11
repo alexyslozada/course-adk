@@ -152,7 +152,7 @@ func main() {
 
 	modelName := os.Getenv("BAKERY_GEMINI_MODEL")
 	if modelName == "" {
-		modelName = "gemini-3.5-flash-lite"
+		modelName = "gemini-3.8-flash"
 	}
 
 	clientConfig := genai.ClientConfig{

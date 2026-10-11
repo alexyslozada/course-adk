@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	modelName := "gemini-3.5-flash-lite"
+	modelName := "gemini-3.8-flash"
 
 	clientConfig := genai.ClientConfig{
 		APIKey: apiKey,

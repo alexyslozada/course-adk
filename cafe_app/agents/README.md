@@ -35,7 +35,7 @@ Qué usa del curso: delegación (ver `my_multiagent_delegation`), `ModeTask` con
 
 | Agente | Modelo | Por qué |
 |---|---|---|
-| Coordinador, administrador, analista, flujos | Gemini (`gemini-3.5-flash-lite`) | Tareas acotadas con tools y esquemas |
+| Coordinador, administrador, analista, flujos | Gemini (`gemini-3.8-flash`) | Tareas acotadas con tools y esquemas |
 | **Barista y reseñas** | **Claude Haiku** (`claude-haiku-4-5`, de Anthropic) | Con Gemini flash-lite leía mal el menú ("no tenemos latte") y decidía mal; son los agentes que hablan con el cliente |
 
 El ADK Go no trae un paquete para Anthropic, pero su endpoint es compatible con la Chat Completions API de OpenAI: `models.go` apunta `openaimodel` a `https://api.anthropic.com/v1/` (igual que `my_agent_with_other_models`). Cada agente puede tener su propio modelo, y el nombre del modelo del barista se cambia con `CAFE_BARISTA_MODEL`. Hacen falta `GOOGLE_API_KEY` y `ANTHROPIC_API_KEY`.

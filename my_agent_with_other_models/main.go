@@ -98,7 +98,7 @@ func newModel(ctx context.Context, provider string) (model.LLM, error) {
 			return nil, fmt.Errorf("debes configurar GOOGLE_API_KEY")
 		}
 		if modelName == "" {
-			modelName = "gemini-3.5-flash-lite"
+			modelName = "gemini-3.8-flash"
 		}
 
 		clientConfig := genai.ClientConfig{

@@ -41,7 +41,7 @@ const SCENES = {
       N("name", 500, 105, "Name", "agent", { w: 460, sub: '"barista"', hidden: true }),
       N("desc", 500, 185, "Description", "agent", { w: 460, sub: '"Prepara las bebidas del pedido"', hidden: true }),
       N("inst", 500, 265, "Instruction", "agent", { w: 460, sub: '"Eres el barista de la cafetería…"', hidden: true }),
-      N("model", 500, 345, "Model", "model", { w: 460, sub: "gemini-3.5-flash-lite", hidden: true }),
+      N("model", 500, 345, "Model", "model", { w: 460, sub: "gemini-3.8-flash", hidden: true }),
     ],
     steps: [
       ["show", "name"], ["cap", "Name: cómo se identifica"],

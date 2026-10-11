@@ -80,7 +80,7 @@ sequenceDiagram
 | Variable | Uso |
 | :---- | :---- |
 | `MODEL_PROVIDER` | `gemini` (por defecto), `openai` o `anthropic` |
-| `MODEL_NAME` | Opcional. Por defecto: `gemini-3.5-flash-lite`, `gpt-5-mini` o `claude-haiku-4-5` |
+| `MODEL_NAME` | Opcional. Por defecto: `gemini-3.8-flash`, `gpt-5-mini` o `claude-haiku-4-5` |
 | `GOOGLE_API_KEY` | Clave de Gemini |
 | `OPENAI_API_KEY` | Clave de OpenAI |
 | `ANTHROPIC_API_KEY` | Clave de Anthropic |
