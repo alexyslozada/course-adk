@@ -59,6 +59,16 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// MCP local por stdio
+	// ----------------------------------------------
+	mcpFilesStruct := NewMCPFilesystemStdio("docs")
+	mcpFiles, err := mcpFilesStruct.ToolSet()
+	if err != nil {
+		fmt.Printf("No se pudo cargar el mcp de archivos: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// MCP via HTTP stateless
 	// ----------------------------------------------
 	mcpStruct := NewMCPGithubHTTP(githubKey)
@@ -93,6 +103,8 @@ func main() {
 			hora actual de una ciudad. Para la hora debes utilizar la 
 			tool llamada "get_current_time".
 
+			También tienes un MCP de archivos con los documentos de la cafetería (menú, horario y proveedores), úsalo cuando el usuario pregunte por ellos.
+
 			También tienes un MCP que te permite trabajar con Github, conéctate cuando el usuario lo solicite.
 
 			También tienes un MCP de Atlassian que te permite trabajar con Jira y Confluence, conéctate cuando el usuario lo solicite.
@@ -108,6 +120,7 @@ func main() {
 			},
 		},
 		Toolsets: []tool.Toolset{
+			mcpFiles,
 			mcpGithub,
 			mcpJira,
 		},

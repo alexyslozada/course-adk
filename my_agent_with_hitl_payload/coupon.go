@@ -79,13 +79,8 @@ func ApplyCoupon(ctx agent.Context, req ApplyCouponRequest) (ApplyCouponResponse
 			return response, nil
 		}
 
-		// Segunda llamada: la persona ya respondió.
-		if !confirmation.Confirmed {
-			response.Status = "El supervisor rechazó el cupón"
-			response.Discount = 0
-			response.Final = price
-			return response, nil
-		}
+		// Segunda llamada: la persona aprobó. Si rechaza, el ADK no vuelve a
+		// llamar a esta función: le devuelve al modelo un error de rechazo.
 
 		// El payload llega como un map genérico; lo convertimos a nuestro struct.
 		var payload ApprovalPayload

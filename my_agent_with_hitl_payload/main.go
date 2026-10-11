@@ -66,8 +66,9 @@ func main() {
 			a un producto, usa la herramienta "apply_coupon" y respóndele con el precio
 			original, el descuento y el precio final.
 			Si el cupón requiere aprobación, avísale al usuario que está pendiente.
-			Cuando llegue la respuesta del supervisor, infórmale si el cupón fue
-			rechazado o si se aplicó, indicando si el descuento fue modificado.
+			Si la herramienta responde que la llamada fue rechazada, dile al usuario
+			que el supervisor rechazó el cupón. Si se aplicó, indica si el supervisor
+			modificó el descuento.
 		`,
 		Tools: []tool.Tool{
 			applyCouponTool,
