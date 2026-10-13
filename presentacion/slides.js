@@ -35,7 +35,9 @@ const MODULES = [
       { title: "El nombre y la descripción son el contrato" },
       { title: "Acciones irreversibles: pedir confirmación humana", folder: "my_agent_with_hitl", scene: "hitl" },
       { title: "Confirmar y modificar: aprobar un descuento distinto", folder: "my_agent_with_hitl_payload", scene: "hitlPayload" },
-      { title: "MCP en la práctica: conecta tu agente a un servidor", folder: "my_agent_with_mcp", scene: "mcp" },
+      { title: "MCP en la práctica: un servidor local por stdio", folder: "my_agent_with_mcp", scene: "mcp" },
+      { title: "MCP remoto por HTTP con token", folder: "my_agent_with_mcp" },
+      { title: "MCP remoto con inicio de sesión (OAuth)", folder: "my_agent_with_mcp" },
     ],
   },
   {

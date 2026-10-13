@@ -14,7 +14,7 @@ Abre `index.html` en el navegador (doble clic). No necesita servidor ni compilar
 | `R` | repetir la animación desde el inicio |
 | `F` | pantalla completa |
 
-También se avanza con clic (el tercio izquierdo retrocede). La URL guarda la diapositiva: `index.html#33` abre la del bucle.
+También se avanza con clic (el tercio izquierdo retrocede). La URL guarda la diapositiva: `index.html#35` abre la del bucle.
 
 ## Archivos
 
