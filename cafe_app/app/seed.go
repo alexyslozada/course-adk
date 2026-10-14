@@ -2,26 +2,32 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 // seed carga datos de ejemplo la primera vez (si no hay usuarios).
+// Los usuarios se aseguran siempre, para que una base ya creada reciba los nuevos.
 func seed(ctx context.Context, s *Store) error {
 	n, err := s.CountUsers(ctx)
 	if err != nil {
 		return err
 	}
-	if n > 0 {
-		return nil
-	}
 
 	users := []struct{ username, password, name, role string }{
 		{"admin", "admin123", "Alexys", "admin"},
 		{"cajero", "cajero123", "Camila", "cashier"},
+		// usuario de servicio con el que el servidor MCP llama a la API
+		{"asistente", "asistente123", "Asistente IA", "cashier"},
 	}
 	for _, u := range users {
+		if _, _, err := s.UserByUsername(ctx, u.username); err == nil {
+			continue
+		} else if !errors.Is(err, ErrNotFound) {
+			return err
+		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(u.password), bcrypt.DefaultCost)
 		if err != nil {
 			return err
@@ -29,6 +35,9 @@ func seed(ctx context.Context, s *Store) error {
 		if err := s.CreateUser(ctx, u.username, string(hash), u.name, u.role); err != nil {
 			return err
 		}
+	}
+	if n > 0 {
+		return nil
 	}
 
 	// stock y mínimo por producto; el pan de queso arranca bajo a propósito

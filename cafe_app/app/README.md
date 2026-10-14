@@ -27,7 +27,7 @@ go run .          # http://localhost:8080
 | `CAFE_DB` | `cafe.db` | Archivo SQLite (se crea con datos de ejemplo la primera vez) |
 | `CAFE_JWT_SECRET` | secreto de desarrollo | Clave con la que se firman los JWT (cámbiala al desplegar) |
 
-Usuarios de ejemplo: `admin` / `admin123` y `cajero` / `cajero123`.
+Usuarios de ejemplo: `admin` / `admin123` y `cajero` / `cajero123`. Además `asistente` / `asistente123`, el usuario de servicio que usa el MCP.
 
 ## Menús
 
