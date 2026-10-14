@@ -64,6 +64,16 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// MCP via HTTP con login (OAuth)
+	// ----------------------------------------------
+	mcpJiraStruct := NewMCPJiraHTTP("Curso ADK con Go")
+	mcpJira, err := mcpJiraStruct.ToolSet()
+	if err != nil {
+		fmt.Printf("No se pudo cargar el mcp de Jira: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// Creación del agente
 	// ----------------------------------------------
 	agentConfig := llmagent.Config{
@@ -76,10 +86,13 @@ func main() {
 			También tienes un MCP de archivos con los documentos de la cafetería (menú, horario y proveedores), úsalo cuando el usuario pregunte por ellos.
 
 			También tienes un MCP que te permite trabajar con Github, conéctate cuando el usuario lo solicite.
+
+			También tienes un MCP de Atlassian que te permite trabajar con Jira y Confluence, conéctate cuando el usuario lo solicite.
 		`,
 		Toolsets: []tool.Toolset{
 			mcpFiles,
 			mcpGithub,
+			mcpJira,
 		},
 	}
 
