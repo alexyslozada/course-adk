@@ -54,6 +54,9 @@ func main() {
 		`,
 		Mode:         llmagent.ModeTask,
 		OutputSchema: &loyaltySchema,
+		// Una tarea no puede transferir la conversación: debe terminar con finish_task.
+		DisallowTransferToParent: true,
+		DisallowTransferToPeers:  true,
 	}
 	loyaltySignup, err := llmagent.New(loyaltySignupConfig)
 	if err != nil {
@@ -74,6 +77,10 @@ func main() {
 		Mode:         llmagent.ModeSingleTurn,
 		InputSchema:  &reviewInputSchema,
 		OutputSchema: &reviewSchema,
+		// Sin esto el ADK le deja transfer_to_agent hacia el coordinador y el
+		// modelo puede devolverle la conversación en vez de responder el JSON.
+		DisallowTransferToParent: true,
+		DisallowTransferToPeers:  true,
 	}
 	reviewClassifier, err := llmagent.New(reviewClassifierConfig)
 	if err != nil {

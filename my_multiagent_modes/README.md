@@ -35,6 +35,15 @@ Al crear el coordinador con `llmagent.New`, el ADK recorre sus `SubAgents` (`age
 
 Al agente en `ModeTask` además le agrega la tool **`finish_task`**, cuyos parámetros son su `OutputSchema`.
 
+### Quítales `transfer_to_agent`
+
+Aunque los alcanza como tools, el ADK les deja a los sub-agentes la tool `transfer_to_agent` hacia su padre (`internal/llminternal/agent_transfer.go`). Si el modelo la usa, el clasificador le devuelve la conversación a `coffee_host` en vez de responder su JSON: la validación del `OutputSchema` falla y el coordinador reintenta en bucle. Por eso los dos llevan:
+
+```go
+DisallowTransferToParent: true,
+DisallowTransferToPeers:  true,
+```
+
 ### Modo single turn: el `InputSchema` lo llena el LLM del coordinador
 
 Nadie en nuestro código envía `reviewInputSchema`. Ese esquema se vuelve los parámetros de la tool `review_classifier(review)`, y es el **LLM del coordinador** quien extrae la reseña del mensaje del usuario para llenarlo.
