@@ -20,6 +20,7 @@ var assets embed.FS
 type App struct {
 	store     *Store
 	jwtSecret []byte
+	agents    *agentsClient
 	templates map[string]*template.Template
 }
 
@@ -49,9 +50,9 @@ var funcs = template.FuncMap{
 	},
 }
 
-func NewApp(store *Store, jwtSecret []byte) (*App, error) {
-	a := &App{store: store, jwtSecret: jwtSecret, templates: map[string]*template.Template{}}
-	for _, name := range []string{"login", "inventario", "productos", "ventas", "clientes", "resenas"} {
+func NewApp(store *Store, jwtSecret []byte, agents *agentsClient) (*App, error) {
+	a := &App{store: store, jwtSecret: jwtSecret, agents: agents, templates: map[string]*template.Template{}}
+	for _, name := range []string{"login", "inventario", "productos", "ventas", "clientes", "resenas", "asistente"} {
 		t, err := template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("plantilla %s: %w", name, err)
@@ -83,6 +84,10 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /clientes", a.requireWeb(a.customerCreate))
 	mux.HandleFunc("GET /resenas", a.requireWeb(a.reviewsPage))
 	mux.HandleFunc("POST /resenas", a.requireWeb(a.reviewCreate))
+
+	mux.HandleFunc("GET /asistente", a.requireWeb(a.assistantPage))
+	mux.HandleFunc("POST /asistente/mensaje", a.requireWeb(a.assistantMessage))
+	mux.HandleFunc("POST /asistente/nueva", a.requireWeb(a.assistantReset))
 
 	a.registerAPI(mux)
 	return mux
