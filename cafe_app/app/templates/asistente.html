@@ -23,18 +23,19 @@
 {{template "chat_reply" .}}
 {{end}}
 
-{{define "chat_decision"}}
-<div class="msg system">{{if .Approved}}✔ Aprobaste la solicitud{{else}}✖ Rechazaste la solicitud{{end}}</div>
-{{template "chat_reply" .}}
+{{/* la respuesta a un mensaje: la pregunta ya la pintó el navegador al enviarla, y la lista de
+     conversaciones se reemplaza aparte (out-of-band) para que aparezca el título de una nueva */}}
+{{define "chat_sent"}}
+{{template "chat_reply" .Reply}}
+{{if .Sidebar.OOB}}{{template "conversations" .Sidebar}}{{end}}
 {{end}}
 
-{{define "content"}}
-{{$current := .Data.Current}}
-<div class="assistant">
-<aside class="conversations">
+{{define "conversations"}}
+{{$current := .Current}}
+<aside id="conversations" class="conversations"{{if .OOB}} hx-swap-oob="true"{{end}}>
   <form method="post" action="/asistente/nueva"><button class="secondary">Nueva conversación</button></form>
   <h2>Conversaciones</h2>
-  {{range .Data.Conversations}}
+  {{range .Conversations}}
   <form method="post" action="/asistente/abrir/{{.ID}}">
     <button class="conversation{{if eq .ID $current}} active{{end}}">{{.Title}}<small>{{.Updated.Format "02/01/2006 15:04"}}</small></button>
   </form>
@@ -42,14 +43,53 @@
   <p class="muted">Aún no tienes conversaciones.</p>
   {{end}}
 </aside>
+{{end}}
+
+{{define "chat_decision"}}
+<div class="msg system">{{if .Approved}}✔ Aprobaste la solicitud{{else}}✖ Rechazaste la solicitud{{end}}</div>
+{{template "chat_reply" .}}
+{{end}}
+
+{{define "content"}}
+<div class="assistant">
+{{template "conversations" .Data}}
 <div class="assistant-chat">
 <div id="chat" class="chat">
   <div class="msg bot">¡Hola! Soy el asistente de la cafetería. Puedes pedirme productos, consultar o ajustar el inventario y aplicar descuentos a ventas.</div>
   {{range .Data.History}}{{template "chat_exchange" .}}{{end}}
 </div>
-<script>{ const chat = document.getElementById('chat'); chat.scrollTop = chat.scrollHeight }</script>
+<script>
+{ const chat = document.getElementById('chat'); chat.scrollTop = chat.scrollHeight }
+
+// chatSending pinta el mensaje en el chat y limpia el cuadro apenas se envía, sin esperar a los
+// agentes. htmx ya tomó los valores del formulario, así que vaciarlo aquí no cambia lo que se envía.
+function chatSending(form) {
+  const chat = document.getElementById('chat'), msg = document.createElement('div')
+  msg.className = 'msg user pending'
+  msg.textContent = form.message.value
+  chat.append(msg)
+  form.dataset.sent = form.message.value
+  form.reset()
+  msg.scrollIntoView({block: 'end'})
+}
+
+// chatSent confirma el mensaje pintado o, si falló, lo quita y devuelve el texto al cuadro para
+// reintentar. Las confirmaciones anteriores al último mensaje ya no aplican y se quitan.
+function chatSent(form, event) {
+  const chat = document.getElementById('chat'), pending = chat.querySelector('.msg.user.pending')
+  if (!event.detail.successful || event.detail.xhr.getResponseHeader('HX-Retarget')) {
+    pending?.remove()
+    form.message.value = form.dataset.sent ?? ''
+    return
+  }
+  pending?.classList.remove('pending')
+  const users = chat.querySelectorAll('.msg.user'), last = users[users.length - 1]
+  chat.querySelectorAll('form.confirm').forEach(f => { if (last && (f.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) f.remove() })
+  chat.lastElementChild.scrollIntoView({block: 'end'})
+}
+</script>
 <form class="inline chat-form" hx-post="/asistente/mensaje" hx-target="#chat" hx-swap="beforeend" hx-indicator="#thinking"
-      hx-on::after-request="if (!event.detail.xhr.getResponseHeader('HX-Retarget')) { this.reset(); { const chat = document.getElementById('chat'), users = chat.querySelectorAll('.msg.user'), last = users[users.length - 1]; chat.querySelectorAll('form.confirm').forEach(f => { if (last && (f.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_FOLLOWING)) f.remove() }) } document.getElementById('chat').lastElementChild.scrollIntoView({block: 'end'}) }">
+      hx-disabled-elt="find button" hx-on::before-request="chatSending(this)" hx-on::after-request="chatSent(this, event)">
   <input name="message" placeholder="Escribe tu mensaje…" autocomplete="off" required autofocus>
   <button>Enviar</button>
   <span id="thinking" class="htmx-indicator">Pensando…</span>

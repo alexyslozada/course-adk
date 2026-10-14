@@ -1,0 +1,68 @@
+# La cafetería completa: docker compose up -d (o podman compose up -d)
+# Los secretos se leen de .env (copia .env.example). Solo la app publica un puerto: los agentes,
+# el MCP y la panadería quedan en la red interna, porque la API del ADK no tiene autenticación.
+# Los cuatro servicios usan la misma imagen (se compila una vez, en el servicio app) y cada uno
+# arranca su binario con entrypoint.
+
+services:
+  app:
+    build: .
+    image: cafe_app
+    ports:
+      - "${CAFE_PORT:-8080}:8080"
+    environment:
+      CAFE_JWT_SECRET: ${CAFE_JWT_SECRET:?define CAFE_JWT_SECRET en .env}
+      CAFE_AGENTS_URL: http://agents:8081/api
+    volumes:
+      - app-data:/data
+    restart: unless-stopped
+
+  mcp:
+    image: cafe_app
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/mcp"]
+    environment:
+      CAFE_MCP_TOKEN: ${CAFE_MCP_TOKEN:?define CAFE_MCP_TOKEN en .env}
+      CAFE_APP_URL: http://app:8080
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # La panadería externa. En la vida real correría en otro servidor, de otra empresa.
+  bakery:
+    image: cafe_app
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/bakery"]
+    # -host 0.0.0.0: dentro de un contenedor, escuchar solo en 127.0.0.1 la dejaría inalcanzable.
+    command: ["web", "-host", "0.0.0.0", "-port", "8001", "a2a", "-a2a_agent_url", "http://bakery:8001"]
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?define GOOGLE_API_KEY en .env}
+      BAKERY_GEMINI_MODEL: ${BAKERY_GEMINI_MODEL:-}
+    depends_on:
+      - app # solo para que la imagen ya exista
+    restart: unless-stopped
+
+  agents:
+    image: cafe_app
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/agents"]
+    command: ["web", "-host", "0.0.0.0", "-port", "8081", "-write-timeout", "2m", "api"]
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?define GOOGLE_API_KEY en .env}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?define ANTHROPIC_API_KEY en .env}
+      CAFE_MCP_TOKEN: ${CAFE_MCP_TOKEN:?define CAFE_MCP_TOKEN en .env}
+      CAFE_MCP_URL: http://mcp:8090
+      CAFE_APP_URL: http://app:8080
+      CAFE_BAKERY_URL: http://bakery:8001
+      CAFE_GEMINI_MODEL: ${CAFE_GEMINI_MODEL:-}
+      CAFE_BARISTA_MODEL: ${CAFE_BARISTA_MODEL:-}
+    volumes:
+      - agents-data:/data
+    depends_on:
+      - mcp
+      - bakery
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  agents-data:

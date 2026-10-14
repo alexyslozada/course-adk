@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"alexyslozada/course-adk/cafe_app/internal/appclient"
+	"github.com/a2aproject/a2a-go/v2/a2a"
+	"github.com/a2aproject/a2a-go/v2/a2aclient/agentcard"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/remoteagent/v2"
 	"google.golang.org/adk/v2/tool"
@@ -25,8 +29,38 @@ func newBakeryAgent(url string) (agent.Agent, error) {
 	return remoteagent.NewA2A(remoteagent.A2AConfig{
 		Name:              "bakery_agent",
 		Description:       "Panadería La Espiga: vende pan a otros negocios.",
-		AgentCardProvider: remoteagent.NewAgentCardProvider(url),
+		AgentCardProvider: sameOriginCardProvider(url),
 	})
+}
+
+// sameOriginCardProvider descarga la agent card y exige que todas las direcciones que declara sean del
+// mismo origen (esquema, host y puerto) que la URL configurada: así una card alterada no puede desviar
+// los pedidos a otro servidor.
+//
+// remoteagent.NewAgentCardProvider hace lo mismo y además exige https (o http solo en localhost). Con
+// docker compose la panadería es http://bakery:8001, dentro de la red privada de los contenedores, y
+// esa regla la rechazaría. Con una panadería real en internet la URL sería https.
+func sameOriginCardProvider(source string) remoteagent.AgentCardProvider {
+	return func(ctx context.Context) (*a2a.AgentCard, error) {
+		sourceURL, err := url.Parse(source)
+		if err != nil {
+			return nil, err
+		}
+		card, err := agentcard.DefaultResolver.Resolve(ctx, source)
+		if err != nil {
+			return nil, fmt.Errorf("no se pudo descargar la agent card: %w", err)
+		}
+		for _, iface := range card.SupportedInterfaces {
+			if iface == nil {
+				continue
+			}
+			ifaceURL, err := url.Parse(iface.URL)
+			if err != nil || ifaceURL.Scheme != sourceURL.Scheme || !strings.EqualFold(ifaceURL.Host, sourceURL.Host) {
+				return nil, fmt.Errorf("la agent card apunta a %q, fuera de %s", iface.URL, source)
+			}
+		}
+		return card, nil
+	}
 }
 
 type restock struct {

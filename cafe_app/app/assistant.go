@@ -41,11 +41,19 @@ type chatDecision struct {
 	Reply
 }
 
+// chatSent es la respuesta a un mensaje junto con la lista de conversaciones actualizada: la
+// primera respuesta de una conversación nueva es la que le pone título.
+type chatSent struct {
+	Reply
+	Sidebar assistantView
+}
+
 // assistantView es lo que muestra la página del asistente.
 type assistantView struct {
 	Conversations []Conversation // las conversaciones anteriores del usuario
 	Current       string         // la conversación abierta (la de la cookie)
 	History       []chatExchange
+	OOB           bool // la lista va en la respuesta de htmx y reemplaza la de la página
 }
 
 // assistantPage muestra el chat con la conversación en curso (la de la cookie), guardada por los
@@ -129,7 +137,14 @@ func (a *App) assistantMessage(w http.ResponseWriter, r *http.Request) {
 		a.htmxError(w, agentsFailure(err))
 		return
 	}
-	a.fragment(w, "asistente", "chat_exchange", chatExchange{Question: text, Reply: reply})
+	// si no se puede listar, la lista de la página se queda como estaba
+	sent := chatSent{Reply: reply}
+	if list, err := a.agents.Conversations(ctx, userID); err != nil {
+		log.Printf("listando las conversaciones: %v", err)
+	} else {
+		sent.Sidebar = assistantView{Conversations: list, Current: sessionID, OOB: true}
+	}
+	a.fragment(w, "asistente", "chat_sent", sent)
 }
 
 // assistantConfirm responde a una confirmación pendiente (aprobar o rechazar, con el payload

@@ -1,0 +1,10 @@
+# Ni secretos, ni bases locales, ni binarios compilados entran a la imagen.
+**/.env
+**/*.db
+**/*.db-shm
+**/*.db-wal
+agents/agents
+app/app
+mcp/mcp
+bakery/bakery
+**/.DS_Store

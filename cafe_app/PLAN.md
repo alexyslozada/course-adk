@@ -104,7 +104,7 @@ Cada fase es pequeña, se prueba por sí sola y termina con commit.
 | 6 | **Flujos** | Un grafo clasifica lo que quiere el cliente: combo → el **código** calcula el combo base (el más económico con stock: una bebida y un alimento por persona) y un **loop** busca una mejora (upselling) dentro del presupuesto, verificada por una tool Go con los precios y el stock reales (corta con `Escalate`); consulta de precios o disponibilidad → un LLM con el MCP de lectura; otro caso → ayuda fija en Go. El pedido en firme sigue con el barista (`ModeTask`): pedir necesita conversación y el grafo no la sostiene | Grafo, loop |
 | 7 | **Usuarios** | Lista de conversaciones anteriores por usuario en el menú Asistente (las sesiones ya se guardan en SQLite). Memoria entre conversaciones con los alcances del estado: `user:preferencias` (cómo quiere ser atendido cada usuario), `app:avisos` (avisos para todo el equipo) y `temp:` para los datos de un solo turno (el combo) | Sesiones persistentes, alcances del estado (`user:`, `app:`, `temp:`) |
 | 8 | **Reabastecimiento** | Si falta pan, el administrador le pide a la panadería externa (`bakery/`, otro proceso) por A2A. El pedido lo hace una tool Go (`order_bread`) **después** de la aprobación con tarjeta (cantidad editable): el modelo no le habla directo a la panadería. La panadería responde con un JSON (`OutputSchema`) y el pan se suma al inventario | A2A, HITL con modificación |
-| 9 | **Despliegue** | `docker-compose` con todos los servicios (SQLite en un volumen) y publicación en un VPS o Railway | Docker, despliegue |
+| 9 | **Despliegue** | `docker-compose` con todos los servicios (una sola imagen distroless, solo la app publica un puerto, SQLite en dos volúmenes), probado con Podman. La publicación en un VPS o Railway quedó documentada, sin hacer (ver `README.md`) | Docker, despliegue |
 
 ### Cómo usa el sistema cada tipo de usuario
 
@@ -130,4 +130,4 @@ Cada fase es pequeña, se prueba por sí sola y termina con commit.
 
 - ~~**Fase 6:** que un `loopagent` funcione como nodo dentro de un grafo (`workflow.NewAgentNode`).~~ Verificado: funciona (ver `agents/README.md`).
 - ~~**Fase 7:** cómo funciona la memoria a largo plazo en el ADK Go (`memory`, `preloadmemorytool`, `loadmemorytool`) y si tiene un servicio persistente o solo en memoria.~~ Verificado: solo hay `InMemoryService` (RAM, crece sin límite, se pierde al reiniciar) y Vertex AI, y nadie llama a `AddSessionToMemory` por su cuenta. Se usó el estado `user:` y `app:` en su lugar (ver `agents/README.md`).
-- **Fase 9:** las condiciones actuales del plan gratuito de Railway; si no conviene, un VPS con Docker.
+- ~~**Fase 9:** las condiciones actuales del plan gratuito de Railway; si no conviene, un VPS con Docker.~~ Verificado (octubre de 2026): el plan gratuito permite 3 servicios y aquí hay 4; hace falta el plan Hobby ($5 al mes) o un VPS. Por ahora el despliegue es el compose local (ver `README.md`).
