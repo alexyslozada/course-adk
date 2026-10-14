@@ -47,7 +47,7 @@ func loadConfig() (Config, error) {
 		GoogleAPIKey:    os.Getenv("GOOGLE_API_KEY"),
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
 		BaristaModel:    getenv("CAFE_BARISTA_MODEL", "claude-haiku-4-5"),
-		GeminiModel:     getenv("CAFE_GEMINI_MODEL", "gemini-3.5-flash-lite"),
+		GeminiModel:     getenv("CAFE_GEMINI_MODEL", "gemini-3.8-flash"),
 		MCPURL:          os.Getenv("CAFE_MCP_URL"),
 		MCPToken:        os.Getenv("CAFE_MCP_TOKEN"),
 		SessionsDB:      getenv("CAFE_SESSIONS_DB", "sessions.db"),
