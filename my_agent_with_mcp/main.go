@@ -10,6 +10,7 @@ import (
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
+	"google.golang.org/adk/v2/tool"
 	"google.golang.org/genai"
 )
 
@@ -38,6 +39,16 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// MCP local por stdio
+	// ----------------------------------------------
+	mcpFilesStruct := NewMCPFilesystemStdio("docs")
+	mcpFiles, err := mcpFilesStruct.ToolSet()
+	if err != nil {
+		fmt.Printf("No se pudo cargar el mcp de archivos: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// Creación del agente
 	// ----------------------------------------------
 	agentConfig := llmagent.Config{
@@ -46,7 +57,12 @@ func main() {
 		Description: "Asistente que usa herramientas de servidores MCP",
 		Instruction: `
 			Eres un asistente útil que responde las consultas del usuario.
+
+			También tienes un MCP de archivos con los documentos de la cafetería (menú, horario y proveedores), úsalo cuando el usuario pregunte por ellos.
 		`,
+		Toolsets: []tool.Toolset{
+			mcpFiles,
+		},
 	}
 
 	a, err := llmagent.New(agentConfig)
