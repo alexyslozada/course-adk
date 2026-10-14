@@ -20,7 +20,6 @@ var assets embed.FS
 type App struct {
 	store     *Store
 	jwtSecret []byte
-	agents    *agentsClient
 	templates map[string]*template.Template
 }
 
@@ -50,9 +49,9 @@ var funcs = template.FuncMap{
 	},
 }
 
-func NewApp(store *Store, jwtSecret []byte, agents *agentsClient) (*App, error) {
-	a := &App{store: store, jwtSecret: jwtSecret, agents: agents, templates: map[string]*template.Template{}}
-	for _, name := range []string{"login", "inventario", "productos", "ventas", "clientes", "resenas", "asistente"} {
+func NewApp(store *Store, jwtSecret []byte) (*App, error) {
+	a := &App{store: store, jwtSecret: jwtSecret, templates: map[string]*template.Template{}}
+	for _, name := range []string{"login", "inventario", "productos", "ventas", "clientes", "resenas"} {
 		t, err := template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+name+".html")
 		if err != nil {
 			return nil, fmt.Errorf("plantilla %s: %w", name, err)
@@ -84,12 +83,6 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /clientes", a.requireWeb(a.customerCreate))
 	mux.HandleFunc("GET /resenas", a.requireWeb(a.reviewsPage))
 	mux.HandleFunc("POST /resenas", a.requireWeb(a.reviewCreate))
-
-	mux.HandleFunc("GET /asistente", a.requireWeb(a.assistantPage))
-	mux.HandleFunc("POST /asistente/mensaje", a.requireWeb(a.assistantMessage))
-	mux.HandleFunc("POST /asistente/confirmar", a.requireWeb(a.assistantConfirm))
-	mux.HandleFunc("POST /asistente/nueva", a.requireWeb(a.assistantReset))
-	mux.HandleFunc("POST /asistente/abrir/{id}", a.requireWeb(a.assistantOpen))
 
 	a.registerAPI(mux)
 	return mux
@@ -249,7 +242,7 @@ type salesData struct {
 
 func (a *App) salesPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	sales, err := a.store.ListSales(ctx, 50, "")
+	sales, err := a.store.ListSales(ctx, 50)
 	if err != nil {
 		a.htmxError(w, err)
 		return
@@ -331,7 +324,7 @@ type reviewsData struct {
 
 func (a *App) reviewsPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	reviews, err := a.store.ListReviews(ctx, "")
+	reviews, err := a.store.ListReviews(ctx)
 	if err != nil {
 		a.htmxError(w, err)
 		return

@@ -8,10 +8,8 @@
 </tr>{{end}}
 
 {{define "content"}}
-<div class="table">
 <table>
   <thead><tr><th>Producto</th><th>Categoría</th><th>Cantidad</th><th>Mínimo</th><th></th><th></th></tr></thead>
   <tbody>{{range .Data}}{{template "inventory_row" .}}{{end}}</tbody>
 </table>
-</div>
 {{end}}

@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS sales (
 	customer_id INTEGER REFERENCES customers(id),
 	user_id     INTEGER NOT NULL REFERENCES users(id),
 	total       INTEGER NOT NULL,
-	discount_percent INTEGER NOT NULL DEFAULT 0 CHECK (discount_percent BETWEEN 0 AND 100),
 	created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -75,22 +74,5 @@ func openDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("creando el esquema: %w", err)
 	}
-	if err := migrate(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("migrando la base: %w", err)
-	}
 	return db, nil
-}
-
-// migrate agrega las columnas nuevas a las bases creadas por versiones anteriores.
-func migrate(db *sql.DB) error {
-	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('sales') WHERE name = 'discount_percent'`).Scan(&n); err != nil {
-		return err
-	}
-	if n == 0 {
-		_, err := db.Exec(`ALTER TABLE sales ADD COLUMN discount_percent INTEGER NOT NULL DEFAULT 0 CHECK (discount_percent BETWEEN 0 AND 100)`)
-		return err
-	}
-	return nil
 }
