@@ -38,3 +38,33 @@ var adminSchema = genai.Schema{
 	},
 	Required: []string{"status", "summary"},
 }
+
+// reportSchema es la forma del reporte del día que entrega el redactor.
+var reportSchema = genai.Schema{
+	Type: genai.TypeObject,
+	Properties: map[string]*genai.Schema{
+		"headline": {
+			Type:        genai.TypeString,
+			Description: "Titular del día en una frase",
+		},
+		"sales_summary": {
+			Type:        genai.TypeString,
+			Description: "Resumen de las ventas: cantidad, total en pesos y productos más vendidos",
+		},
+		"stock_alerts": {
+			Type:        genai.TypeArray,
+			Description: "Una alerta por cada producto en o bajo su mínimo; vacía si no hay",
+			Items:       &genai.Schema{Type: genai.TypeString},
+		},
+		"review_summary": {
+			Type:        genai.TypeString,
+			Description: "Resumen de las reseñas: cantidad, promedio y las negativas",
+		},
+		"recommendations": {
+			Type:        genai.TypeArray,
+			Description: "Entre 1 y 3 recomendaciones concretas",
+			Items:       &genai.Schema{Type: genai.TypeString},
+		},
+	},
+	Required: []string{"headline", "sales_summary", "stock_alerts", "review_summary", "recommendations"},
+}

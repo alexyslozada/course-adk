@@ -248,7 +248,7 @@ type salesData struct {
 
 func (a *App) salesPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	sales, err := a.store.ListSales(ctx, 50)
+	sales, err := a.store.ListSales(ctx, 50, "")
 	if err != nil {
 		a.htmxError(w, err)
 		return
@@ -330,7 +330,7 @@ type reviewsData struct {
 
 func (a *App) reviewsPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	reviews, err := a.store.ListReviews(ctx)
+	reviews, err := a.store.ListReviews(ctx, "")
 	if err != nil {
 		a.htmxError(w, err)
 		return

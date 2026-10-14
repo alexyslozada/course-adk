@@ -163,7 +163,7 @@ func (a *App) apiListSales(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 500 {
 		limit = v
 	}
-	sales, err := a.store.ListSales(r.Context(), limit)
+	sales, err := a.store.ListSales(r.Context(), limit, r.URL.Query().Get("date"))
 	if err != nil {
 		apiError(w, err)
 		return
@@ -222,7 +222,7 @@ func (a *App) apiApplyDiscount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) apiListReviews(w http.ResponseWriter, r *http.Request) {
-	reviews, err := a.store.ListReviews(r.Context())
+	reviews, err := a.store.ListReviews(r.Context(), r.URL.Query().Get("date"))
 	if err != nil {
 		apiError(w, err)
 		return

@@ -400,9 +400,26 @@ func (s *Store) ApplyDiscount(ctx context.Context, saleID, percent int) (Sale, e
 	return s.GetSale(ctx, saleID)
 }
 
+// validDate comprueba que date sea vacío (sin filtro) o un día con formato AAAA-MM-DD.
+func validDate(date string) error {
+	if date == "" {
+		return nil
+	}
+	if _, err := time.Parse(time.DateOnly, date); err != nil {
+		return InputError("la fecha debe tener el formato AAAA-MM-DD")
+	}
+	return nil
+}
+
 // ListSales devuelve las últimas ventas, la más reciente primero.
-func (s *Store) ListSales(ctx context.Context, limit int) ([]Sale, error) {
-	rows, err := s.db.QueryContext(ctx, saleSelect+` ORDER BY s.id DESC LIMIT ?`, limit)
+// Con date (AAAA-MM-DD, hora local) solo devuelve las de ese día.
+func (s *Store) ListSales(ctx context.Context, limit int, date string) ([]Sale, error) {
+	if err := validDate(date); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		saleSelect+` WHERE (? = '' OR date(s.created_at, 'localtime') = ?) ORDER BY s.id DESC LIMIT ?`,
+		date, date, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -467,8 +484,14 @@ func scanReview(row interface{ Scan(...any) error }) (Review, error) {
 	return r, err
 }
 
-func (s *Store) ListReviews(ctx context.Context) ([]Review, error) {
-	rows, err := s.db.QueryContext(ctx, reviewSelect+` ORDER BY r.id DESC`)
+// ListReviews devuelve las reseñas, la más reciente primero. Con date (AAAA-MM-DD, hora local)
+// solo devuelve las de ese día.
+func (s *Store) ListReviews(ctx context.Context, date string) ([]Review, error) {
+	if err := validDate(date); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		reviewSelect+` WHERE (? = '' OR date(r.created_at, 'localtime') = ?) ORDER BY r.id DESC`, date, date)
 	if err != nil {
 		return nil, err
 	}
