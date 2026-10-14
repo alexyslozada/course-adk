@@ -52,6 +52,11 @@ func main() {
 			los datos que falten: su nombre, su bebida favorita y su mes de
 			cumpleaños.
 		`,
+		Mode:         llmagent.ModeTask,
+		OutputSchema: &loyaltySchema,
+		// Una tarea no puede transferir la conversación: debe terminar con finish_task.
+		DisallowTransferToParent: true,
+		DisallowTransferToPeers:  true,
 	}
 	loyaltySignup, err := llmagent.New(loyaltySignupConfig)
 	if err != nil {
@@ -65,10 +70,17 @@ func main() {
 	// en un solo turno y devuelve el control al coordinador.
 	// ----------------------------------------------
 	reviewClassifierConfig := llmagent.Config{
-		Name:        "review_classifier",
-		Model:       model,
-		Description: "Clasifica la reseña de un cliente.",
-		Instruction: "Eres el analista de reseñas de una cafetería. Clasifica la reseña que recibes.",
+		Name:         "review_classifier",
+		Model:        model,
+		Description:  "Clasifica la reseña de un cliente.",
+		Instruction:  "Eres el analista de reseñas de una cafetería. Clasifica la reseña que recibes.",
+		Mode:         llmagent.ModeSingleTurn,
+		InputSchema:  &reviewInputSchema,
+		OutputSchema: &reviewSchema,
+		// Sin esto el ADK le deja transfer_to_agent hacia el coordinador y el
+		// modelo puede devolverle la conversación en vez de responder el JSON.
+		DisallowTransferToParent: true,
+		DisallowTransferToPeers:  true,
 	}
 	reviewClassifier, err := llmagent.New(reviewClassifierConfig)
 	if err != nil {
@@ -77,17 +89,39 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Lanzar el agente
-	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
+	// Agente coordinador
+	// Los sub-agentes en modo task y single_turn no se alcanzan con
+	// transfer_to_agent: el ADK los convierte en tools del coordinador.
 	// ----------------------------------------------
-	loader, err := agent.NewMultiLoader(loyaltySignup, reviewClassifier)
+	coordinatorConfig := llmagent.Config{
+		Name:        "coffee_host",
+		Model:       model,
+		Description: "Recibe a los clientes de la cafetería y los atiende.",
+		Instruction: `
+			Eres el anfitrión de una cafetería.
+			- Si el cliente quiere unirse al club, usa "loyalty_signup". Cuando
+			  termine, dale la bienvenida al club por su nombre.
+			- Si el cliente deja una opinión, clasifícala con "review_classifier" y
+			  respóndele según el sentimiento: agradece si es positiva y
+			  discúlpate si es negativa.
+		`,
+		SubAgents: []agent.Agent{
+			loyaltySignup,
+			reviewClassifier,
+		},
+	}
+	coordinator, err := llmagent.New(coordinatorConfig)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
+	// ----------------------------------------------
+	// Lanzar el agente
+	// Se lanza solo el coordinador: los sub-agentes viven dentro de él.
+	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: loader,
+		AgentLoader: agent.NewSingleLoader(coordinator),
 	}
 
 	launch := full.NewLauncher()
