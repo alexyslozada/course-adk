@@ -7,9 +7,11 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
+	"google.golang.org/adk/v2/agent/workflowagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
+	"google.golang.org/adk/v2/workflow"
 	"google.golang.org/genai"
 )
 
@@ -88,17 +90,70 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Lanzar el agente
-	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
+	// Nodos del grafo
+	// AgentNode envuelve un agente (LLM). FunctionNode envuelve una función Go.
+	// La salida de cada nodo es el input del siguiente.
 	// ----------------------------------------------
-	loader, err := agent.NewMultiLoader(reviewClassifier, thanksWriter, apologyWriter)
+	classifierNode, err := workflow.NewAgentNode(reviewClassifier, workflow.NodeConfig{})
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	thanksNode, err := workflow.NewAgentNode(thanksWriter, workflow.NodeConfig{})
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	apologyNode, err := workflow.NewAgentNode(apologyWriter, workflow.NodeConfig{})
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
+	// "Emitting" porque además de devolver su salida, emite el evento con la ruta
+	routerNode := workflow.NewEmittingFunctionNode("router", Route, workflow.NodeConfig{})
+	ticketNode := workflow.NewFunctionNode("create_ticket", CreateTicket, workflow.NodeConfig{})
+	improvementNode := workflow.NewFunctionNode("improvement_question", ImprovementQuestion, workflow.NodeConfig{})
+
+	// ----------------------------------------------
+	// Aristas del grafo
+	// Chain une los nodos en línea. Las aristas con Route solo se siguen si el
+	// router emitió esa ruta. workflow.Default se sigue si ninguna otra coincide.
+	// ----------------------------------------------
+	edges := workflow.Concat(
+		workflow.Chain(workflow.Start, classifierNode, routerNode),
+		[]workflow.Edge{
+			{From: routerNode, To: thanksNode, Route: workflow.StringRoute("positivo")},
+			{From: routerNode, To: ticketNode, Route: workflow.StringRoute("negativo")},
+			{From: routerNode, To: improvementNode, Route: workflow.Default},
+		},
+		workflow.Chain(ticketNode, apologyNode),
+	)
+
+	// ----------------------------------------------
+	// Workflow de grafo
+	// ----------------------------------------------
+	reviewGraphConfig := workflowagent.Config{
+		Name:        "review_graph",
+		Description: "Clasifica una reseña y la responde por el camino adecuado.",
+		Edges:       edges,
+		SubAgents: []agent.Agent{
+			reviewClassifier,
+			thanksWriter,
+			apologyWriter,
+		},
+	}
+	reviewGraph, err := workflowagent.New(reviewGraphConfig)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
+	// Lanzar el agente
+	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: loader,
+		AgentLoader: agent.NewSingleLoader(reviewGraph),
 	}
 
 	launch := full.NewLauncher()
