@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"alexyslozada/course-adk/cafe_app/internal/appclient"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -57,7 +58,7 @@ type Review struct {
 }
 
 // registerTools declara las tools del MCP. Cada una es una llamada a la API de la app.
-func registerTools(s *mcp.Server, app *appClient) {
+func registerTools(s *mcp.Server, app *appclient.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_menu",
 		Description: "Lista los productos del menú con su id, categoría y precio en pesos. Úsala para saber qué se vende y cuánto cuesta.",
@@ -95,10 +96,10 @@ type menuOut struct {
 	Products []Product `json:"products"`
 }
 
-func listMenu(app *appClient) mcp.ToolHandlerFor[struct{}, menuOut] {
+func listMenu(app *appclient.Client) mcp.ToolHandlerFor[struct{}, menuOut] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, menuOut, error) {
 		var all []Product
-		if err := app.do(ctx, "GET", "/api/products", nil, &all); err != nil {
+		if err := app.Do(ctx, "GET", "/api/products", nil, &all); err != nil {
 			return nil, menuOut{}, err
 		}
 		out := menuOut{Products: []Product{}}
@@ -121,10 +122,10 @@ type stockOut struct {
 	Items []InventoryItem `json:"items"`
 }
 
-func getStock(app *appClient) mcp.ToolHandlerFor[stockIn, stockOut] {
+func getStock(app *appclient.Client) mcp.ToolHandlerFor[stockIn, stockOut] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, in stockIn) (*mcp.CallToolResult, stockOut, error) {
 		var all []InventoryItem
-		if err := app.do(ctx, "GET", "/api/inventory", nil, &all); err != nil {
+		if err := app.Do(ctx, "GET", "/api/inventory", nil, &all); err != nil {
 			return nil, stockOut{}, err
 		}
 		out := stockOut{Items: []InventoryItem{}}
@@ -143,10 +144,10 @@ type customersOut struct {
 	Customers []Customer `json:"customers"`
 }
 
-func listCustomers(app *appClient) mcp.ToolHandlerFor[struct{}, customersOut] {
+func listCustomers(app *appclient.Client) mcp.ToolHandlerFor[struct{}, customersOut] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, customersOut, error) {
 		out := customersOut{Customers: []Customer{}}
-		if err := app.do(ctx, "GET", "/api/customers", nil, &out.Customers); err != nil {
+		if err := app.Do(ctx, "GET", "/api/customers", nil, &out.Customers); err != nil {
 			return nil, customersOut{}, err
 		}
 		return nil, out, nil
@@ -163,7 +164,7 @@ type salesOut struct {
 	Sales []Sale `json:"sales"`
 }
 
-func listSales(app *appClient) mcp.ToolHandlerFor[salesIn, salesOut] {
+func listSales(app *appclient.Client) mcp.ToolHandlerFor[salesIn, salesOut] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, in salesIn) (*mcp.CallToolResult, salesOut, error) {
 		limit := in.Limit
 		if limit <= 0 {
@@ -172,7 +173,7 @@ func listSales(app *appClient) mcp.ToolHandlerFor[salesIn, salesOut] {
 		limit = min(limit, 100)
 		out := salesOut{Sales: []Sale{}}
 		path := "/api/sales?" + url.Values{"limit": {fmt.Sprint(limit)}}.Encode()
-		if err := app.do(ctx, "GET", path, nil, &out.Sales); err != nil {
+		if err := app.Do(ctx, "GET", path, nil, &out.Sales); err != nil {
 			return nil, salesOut{}, err
 		}
 		return nil, out, nil
@@ -191,10 +192,10 @@ type saleIn struct {
 	Items      []saleLine `json:"items" jsonschema:"productos de la venta"`
 }
 
-func createSale(app *appClient) mcp.ToolHandlerFor[saleIn, Sale] {
+func createSale(app *appclient.Client) mcp.ToolHandlerFor[saleIn, Sale] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, in saleIn) (*mcp.CallToolResult, Sale, error) {
 		var sale Sale
-		if err := app.do(ctx, "POST", "/api/sales", in, &sale); err != nil {
+		if err := app.Do(ctx, "POST", "/api/sales", in, &sale); err != nil {
 			return nil, Sale{}, err
 		}
 		return nil, sale, nil
@@ -210,10 +211,10 @@ type reviewIn struct {
 	ProductID  *int   `json:"product_id,omitempty" jsonschema:"id del producto reseñado (opcional)"`
 }
 
-func createReview(app *appClient) mcp.ToolHandlerFor[reviewIn, Review] {
+func createReview(app *appclient.Client) mcp.ToolHandlerFor[reviewIn, Review] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, in reviewIn) (*mcp.CallToolResult, Review, error) {
 		var review Review
-		if err := app.do(ctx, "POST", "/api/reviews", in, &review); err != nil {
+		if err := app.Do(ctx, "POST", "/api/reviews", in, &review); err != nil {
 			return nil, Review{}, err
 		}
 		return nil, review, nil

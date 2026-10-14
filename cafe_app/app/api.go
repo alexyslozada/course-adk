@@ -49,6 +49,8 @@ func (a *App) registerAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/customers", a.requireAPI(a.apiCreateCustomer))
 	mux.HandleFunc("GET /api/sales", a.requireAPI(a.apiListSales))
 	mux.HandleFunc("POST /api/sales", a.requireAPI(a.apiCreateSale))
+	mux.HandleFunc("GET /api/sales/{id}", a.requireAPI(a.apiGetSale))
+	mux.HandleFunc("POST /api/sales/{id}/discount", a.requireAPI(a.apiApplyDiscount))
 	mux.HandleFunc("GET /api/reviews", a.requireAPI(a.apiListReviews))
 	mux.HandleFunc("POST /api/reviews", a.requireAPI(a.apiCreateReview))
 }
@@ -183,6 +185,40 @@ func (a *App) apiCreateSale(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, sale)
+}
+
+func (a *App) apiGetSale(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "id inválido"})
+		return
+	}
+	sale, err := a.store.GetSale(r.Context(), id)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, sale)
+}
+
+func (a *App) apiApplyDiscount(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "id inválido"})
+		return
+	}
+	var in struct {
+		Percent int `json:"percent"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	sale, err := a.store.ApplyDiscount(r.Context(), id, in.Percent)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, sale)
 }
 
 func (a *App) apiListReviews(w http.ResponseWriter, r *http.Request) {

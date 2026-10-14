@@ -21,3 +21,20 @@ var orderSchema = genai.Schema{
 	},
 	Required: []string{"order_id", "total", "summary"},
 }
+
+// adminSchema es lo que el administrador entrega al coordinador cuando termina.
+var adminSchema = genai.Schema{
+	Type: genai.TypeObject,
+	Properties: map[string]*genai.Schema{
+		"status": {
+			Type:        genai.TypeString,
+			Description: "Resultado: hecho si se aplicó el cambio, rechazado si el administrador no lo aprobó, sin_cambios si no hubo nada que cambiar",
+			Enum:        []string{"hecho", "rechazado", "sin_cambios"},
+		},
+		"summary": {
+			Type:        genai.TypeString,
+			Description: "Qué se hizo, en una frase",
+		},
+	},
+	Required: []string{"status", "summary"},
+}

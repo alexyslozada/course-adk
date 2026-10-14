@@ -55,13 +55,15 @@ type SaleItem struct {
 }
 
 type Sale struct {
-	ID         int        `json:"id"`
-	CustomerID *int       `json:"customer_id"`
-	Customer   string     `json:"customer"`
-	Cashier    string     `json:"cashier"`
-	Total      int        `json:"total"`
-	CreatedAt  time.Time  `json:"created_at"`
-	Items      []SaleItem `json:"items"`
+	ID         int    `json:"id"`
+	CustomerID *int   `json:"customer_id"`
+	Customer   string `json:"customer"`
+	Cashier    string `json:"cashier"`
+	Total      int    `json:"total"`
+	// DiscountPercent es el descuento ya aplicado; Total es el valor final, con el descuento incluido.
+	DiscountPercent int        `json:"discount_percent"`
+	CreatedAt       time.Time  `json:"created_at"`
+	Items           []SaleItem `json:"items"`
 }
 
 // SaleLine es lo que se pide al crear una venta: producto y cantidad.
@@ -334,14 +336,14 @@ func (s *Store) CreateSale(ctx context.Context, userID int, customerID *int, lin
 }
 
 const saleSelect = `
-	SELECT s.id, s.customer_id, COALESCE(c.name, ''), u.name, s.total, s.created_at
+	SELECT s.id, s.customer_id, COALESCE(c.name, ''), u.name, s.total, s.discount_percent, s.created_at
 	FROM sales s
 	JOIN users u ON u.id = s.user_id
 	LEFT JOIN customers c ON c.id = s.customer_id`
 
 func scanSale(row interface{ Scan(...any) error }) (Sale, error) {
 	var sale Sale
-	err := row.Scan(&sale.ID, &sale.CustomerID, &sale.Customer, &sale.Cashier, &sale.Total, &sale.CreatedAt)
+	err := row.Scan(&sale.ID, &sale.CustomerID, &sale.Customer, &sale.Cashier, &sale.Total, &sale.DiscountPercent, &sale.CreatedAt)
 	return sale, err
 }
 
@@ -357,6 +359,45 @@ func (s *Store) GetSale(ctx context.Context, id int) (Sale, error) {
 		return Sale{}, err
 	}
 	return sale, nil
+}
+
+// MaxDiscountPercent es el mayor descuento que se puede aplicar a una venta.
+const MaxDiscountPercent = 50
+
+// ApplyDiscount aplica un descuento a una venta ya registrada y recalcula su total.
+// Solo se puede una vez por venta.
+func (s *Store) ApplyDiscount(ctx context.Context, saleID, percent int) (Sale, error) {
+	if percent < 1 || percent > MaxDiscountPercent {
+		return Sale{}, InputError(fmt.Sprintf("el descuento debe estar entre 1 y %d por ciento", MaxDiscountPercent))
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Sale{}, err
+	}
+	defer tx.Rollback()
+
+	var current, subtotal int
+	err = tx.QueryRowContext(ctx, `
+		SELECT s.discount_percent, COALESCE(SUM(si.quantity * si.unit_price), 0)
+		FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id
+		WHERE s.id = ? GROUP BY s.id`, saleID).Scan(&current, &subtotal)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Sale{}, ErrNotFound
+	}
+	if err != nil {
+		return Sale{}, err
+	}
+	if current > 0 {
+		return Sale{}, InputError(fmt.Sprintf("la venta %d ya tiene un descuento del %d por ciento", saleID, current))
+	}
+	total := subtotal * (100 - percent) / 100
+	if _, err := tx.ExecContext(ctx, `UPDATE sales SET total = ?, discount_percent = ? WHERE id = ?`, total, percent, saleID); err != nil {
+		return Sale{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Sale{}, err
+	}
+	return s.GetSale(ctx, saleID)
 }
 
 // ListSales devuelve las últimas ventas, la más reciente primero.

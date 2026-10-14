@@ -36,3 +36,9 @@ label.qty { background: #fff; border: 1px solid var(--line); border-radius: .35r
 button.secondary { background: #fff; color: var(--accent); }
 .htmx-indicator { opacity: 0; transition: opacity .2s; align-self: center; color: var(--accent); }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+.badge.ok { background: #2e7d32; }
+.msg.system { align-self: center; background: none; border: 0; color: #666; font-size: .85rem; padding: 0; }
+form.confirm { align-self: flex-start; max-width: 75%; background: #fff8e1; border: 1px solid #e0b84a; border-radius: .8rem; padding: .7rem .9rem; display: flex; flex-direction: column; gap: .5rem; }
+form.confirm p { margin: 0; }
+form.confirm label { display: flex; flex-direction: column; gap: .2rem; }
+form.confirm .actions { display: flex; gap: .5rem; }

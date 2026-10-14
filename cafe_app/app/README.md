@@ -33,7 +33,7 @@ Usuarios de ejemplo: `admin` / `admin123` y `cajero` / `cajero123`. Además `asi
 
 ## Menús
 
-Inventario (edición en línea; marca el stock bajo), Productos, Ventas, Clientes, Reseñas y **Asistente** (chat con los agentes; ver [`../agents`](../agents)). Los formularios usan htmx: el servidor responde solo la fila nueva, y los errores aparecen en la línea roja sin recargar la página.
+Inventario (edición en línea; marca el stock bajo), Productos, Ventas, Clientes, Reseñas y **Asistente** (chat con los agentes; ver [`../agents`](../agents)). En el **Asistente**, cuando un agente necesita la aprobación de una persona (inventario, descuentos), el chat muestra una tarjeta con Aprobar / Rechazar y los valores que se pueden modificar. Los formularios usan htmx: el servidor responde solo la fila nueva, y los errores aparecen en la línea roja sin recargar la página.
 
 ## API REST
 
@@ -46,6 +46,7 @@ Se autentica con un **JWT** (HS256, expira a las 24 horas). El navegador lo reci
 | `GET /api/inventory` · `PUT /api/inventory/{product_id}` | Lista / fija cantidad y mínimo |
 | `GET /api/customers` · `POST /api/customers` | Lista / crea clientes |
 | `GET /api/sales?limit=50` · `POST /api/sales` | Lista / registra una venta (`items`: producto y cantidad) |
+| `GET /api/sales/{id}` · `POST /api/sales/{id}/discount` | Consulta una venta / le aplica un descuento (`percent` de 1 a 50, una sola vez por venta) |
 | `GET /api/reviews` · `POST /api/reviews` | Lista / crea reseñas |
 
 ```bash
