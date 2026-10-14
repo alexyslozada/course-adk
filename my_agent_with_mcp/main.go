@@ -25,6 +25,11 @@ func main() {
 		fmt.Println("Debes configurar GOOGLE_API_KEY")
 		os.Exit(1)
 	}
+	githubKey := os.Getenv("GITHUB_TOKEN")
+	if githubKey == "" {
+		fmt.Println("Debes configurar GITHUB_TOKEN")
+		os.Exit(1)
+	}
 
 	modelName := "gemini-3.8-flash"
 
@@ -49,6 +54,16 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// MCP via HTTP stateless
+	// ----------------------------------------------
+	mcpStruct := NewMCPGithubHTTP(githubKey)
+	mcpGithub, err := mcpStruct.ToolSet()
+	if err != nil {
+		fmt.Printf("No se pudo cargar el mcp: %s", err.Error())
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// Creación del agente
 	// ----------------------------------------------
 	agentConfig := llmagent.Config{
@@ -59,9 +74,12 @@ func main() {
 			Eres un asistente útil que responde las consultas del usuario.
 
 			También tienes un MCP de archivos con los documentos de la cafetería (menú, horario y proveedores), úsalo cuando el usuario pregunte por ellos.
+
+			También tienes un MCP que te permite trabajar con Github, conéctate cuando el usuario lo solicite.
 		`,
 		Toolsets: []tool.Toolset{
 			mcpFiles,
+			mcpGithub,
 		},
 	}
 
