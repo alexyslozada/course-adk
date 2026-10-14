@@ -59,7 +59,7 @@ La memoria no es una fase aparte al final: sin ella el chat se rompe. Tiene tres
 
 1. **Conversación**: sesiones persistentes en SQLite y la app que las muestra. Desde la fase 3.
 2. **Contexto de los flujos**: los agentes envueltos como tool no ven la sesión, así que el coordinador la guarda en el estado con un callback. Desde la fase 6.
-3. **Entre conversaciones**: "la semana pasada pediste…". Fase 7.
+3. **Entre conversaciones**: el estado con prefijo `user:` (preferencias del usuario) y `app:` (avisos para todos). Fase 7.
 
 > Los niveles 1 y 2 se agregaron después de construir las fases 3 a 6, al ver que un seguimiento como "ok, aumenta el presupuesto" perdía el contexto. En un proyecto nuevo, **la sesión persistente y el historial en la app van desde la primera vez que aparece un chat (fase 3)**, y cada flujo se prueba con conversaciones de varios mensajes, no con uno solo.
 
@@ -102,7 +102,7 @@ Cada fase es pequeña, se prueba por sí sola y termina con commit.
 | 4 | **Administrador** | Tools Go directas: ajusta inventario (confirmación sí/no) y aprueba descuentos que puede modificar | Tools propias, HITL booleano, HITL con modificación, MCP vs tools Go |
 | 5 | **Analista** | Reporte del día: ventas, inventario y reseñas analizados en **paralelo**, luego un redactor en **secuencia**. Usa una skill y responde con salida estructurada | Parallel, sequential, skills, `OutputSchema` |
 | 6 | **Flujos** | Un grafo clasifica lo que quiere el cliente: combo → el **código** calcula el combo base (el más económico con stock: una bebida y un alimento por persona) y un **loop** busca una mejora (upselling) dentro del presupuesto, verificada por una tool Go con los precios y el stock reales (corta con `Escalate`); consulta de precios o disponibilidad → un LLM con el MCP de lectura; otro caso → ayuda fija en Go. El pedido en firme sigue con el barista (`ModeTask`): pedir necesita conversación y el grafo no la sostiene | Grafo, loop |
-| 7 | **Usuarios** | Lista de conversaciones anteriores por usuario en el menú Asistente (las sesiones ya se guardan en SQLite desde la fase 3) y memoria a largo plazo entre conversaciones ("la semana pasada pediste...") | Sesiones persistentes, memoria a largo plazo |
+| 7 | **Usuarios** | Lista de conversaciones anteriores por usuario en el menú Asistente (las sesiones ya se guardan en SQLite). Memoria entre conversaciones con los alcances del estado: `user:preferencias` (cómo quiere ser atendido cada usuario), `app:avisos` (avisos para todo el equipo) y `temp:` para los datos de un solo turno (el combo) | Sesiones persistentes, alcances del estado (`user:`, `app:`, `temp:`) |
 | 8 | **Reabastecimiento** | Si falta pan, el administrador le pide a la panadería externa por A2A | A2A |
 | 9 | **Despliegue** | `docker-compose` con todos los servicios (SQLite en un volumen) y publicación en un VPS o Railway | Docker, despliegue |
 
@@ -129,5 +129,5 @@ Cada fase es pequeña, se prueba por sí sola y termina con commit.
 ## Pendientes por verificar
 
 - ~~**Fase 6:** que un `loopagent` funcione como nodo dentro de un grafo (`workflow.NewAgentNode`).~~ Verificado: funciona (ver `agents/README.md`).
-- **Fase 7:** cómo funciona la memoria a largo plazo en el ADK Go (`memory`, `preloadmemorytool`, `loadmemorytool`) y si tiene un servicio persistente o solo en memoria.
+- ~~**Fase 7:** cómo funciona la memoria a largo plazo en el ADK Go (`memory`, `preloadmemorytool`, `loadmemorytool`) y si tiene un servicio persistente o solo en memoria.~~ Verificado: solo hay `InMemoryService` (RAM, crece sin límite, se pierde al reiniciar) y Vertex AI, y nadie llama a `AddSessionToMemory` por su cuenta. Se usó el estado `user:` y `app:` en su lugar (ver `agents/README.md`).
 - **Fase 9:** las condiciones actuales del plan gratuito de Railway; si no conviene, un VPS con Docker.

@@ -1,4 +1,4 @@
-# cafe_app/agents — coordinador, barista, administrador, reseñas, analista y flujos (fases 3 a 6)
+# cafe_app/agents — coordinador, barista, administrador, reseñas, analista y flujos (fases 3 a 7)
 
 El sistema de agentes de la cafetería (ADK). El **coordinador** recibe al usuario y **delega** en dos sub-agentes en `ModeTask` y en un pipeline de análisis:
 
@@ -248,7 +248,7 @@ La lección: usa el modelo para lo que el código no puede hacer (entender la pe
 - **Un nodo Go que cierra el grafo debe emitir su mensaje** (`say`, con `NewEmittingFunctionNode`): quien corre el grafo toma el texto del último evento con contenido, no la salida (`Event.Output`) de un nodo Go.
 - **Un agente con `OutputSchema` entrega su salida como objeto**, no como texto JSON: el nodo Go que la recibe debe aceptar las dos formas (`decodeNodeInput`).
 - **Verificar en código no basta si los datos que se verifican los dicta el modelo**: las personas y el presupuesto viven en el estado, no en los parámetros de la tool.
-- Las claves del estado llevan el id de la invocación, para no confundir un combo con el de una petición anterior de la misma sesión.
+- Las claves del combo llevan el prefijo `temp:` (`temp:combo_params`, `temp:combo_base`, `temp:upsell_check`): solo sirven mientras se arma ese combo y el ADK las descarta al terminar el turno, así que nunca se confunden con las de un combo anterior (ver [los alcances del estado](#los-alcances-del-estado)).
 
 ## La memoria
 
@@ -258,7 +258,7 @@ La memoria es lo primero que se rompe en un chat de agentes, así que conviene e
 |---|---|---|---|
 | **1. Conversación** | Lo que se dijo en este chat | La **sesión** del ADK, en SQLite (`sessions.db`) | ✅ Sobrevive a reiniciar los agentes; la app la muestra al recargar el chat |
 | **2. Contexto de los flujos y las tareas** | Que un flujo o una tarea sepa de qué se venía hablando y quién es el cliente | El estado de la sesión (`conversation`, `customer_name`) | ✅ La conversación la guarda un callback `BeforeModel`; el nombre, `register_sale` |
-| **3. Entre conversaciones** | "La semana pasada pediste…" | Pendiente (fase 7) | ⏳ |
+| **3. Entre conversaciones** | Lo que el asistente recuerda del usuario o de la cafetería en un chat nuevo | El estado con prefijo `user:` (`user:preferencias`) y `app:` (`app:avisos`) | ✅ Fase 7 |
 
 ### Por qué los flujos no veían la conversación
 
@@ -284,11 +284,56 @@ sequenceDiagram
     C-->>U: respuesta
 ```
 
-`conversation.go` guarda el texto de la conversación (sin llamadas a tools ni pensamientos) y `conversationTool` se la entrega al grafo junto con lo que pide ahora el cliente. Es el único callback del proyecto: sirve para algo que de otra forma no se puede hacer.
+`conversation.go` guarda el texto de la conversación (sin llamadas a tools ni pensamientos) y `conversationTool` se la entrega al grafo junto con lo que pide ahora el cliente. Los callbacks del proyecto son solo dos, y cada uno hace algo que de otra forma no se puede: este y el que le pone título a la conversación (ver abajo).
 
 ### Persistencia
 
 El coordinador corre con el servicio de sesiones en base de datos (`session/database` con SQLite, como en `my_agent_with_sessions_db`): `CAFE_SESSIONS_DB` (por defecto `sessions.db`). La app guarda el id de la conversación en la cookie `cafe_chat`; al abrir el menú Asistente pide la sesión a la API del ADK y dibuja los mensajes, incluida una aprobación que haya quedado pendiente.
+
+### La lista de conversaciones (fase 7)
+
+El menú Asistente lista las conversaciones del usuario con `GET /api/apps/cafe_coordinator/users/{id}/sessions`. Ese listado trae el **estado** de cada sesión, pero no sus mensajes, así que el título se guarda en el estado: el callback `BeforeAgent` del coordinador, `titleConversation` (`memory.go`), anota el primer mensaje del usuario en la clave `title`. Las conversaciones anteriores a la fase 7 no tienen título y no se listan.
+
+Para abrir una conversación, la app comprueba que esté en la lista **de ese usuario** antes de guardarla en la cookie: nadie abre la conversación de otro aunque conozca su id.
+
+### Los alcances del estado
+
+El estado de la sesión es un mapa clave → valor, y **el prefijo de la clave decide quién la ve y cuánto dura**. Nombres como `customer_name` o `upsell_feedback` no tienen nada especial: los elegimos nosotros. Lo que cambia su alcance es el prefijo.
+
+| Prefijo | Quién la ve | Cuánto dura | En la cafetería |
+|---|---|---|---|
+| *(ninguno)* | Solo esta conversación | Lo que dure la conversación (se guarda en SQLite) | `customer_name`, `conversation`, `title`, el contador de `off_topic` |
+| `user:` | Todas las conversaciones del **mismo usuario** (quien inició sesión en la app) | Siempre | `user:preferencias`: "me llamo Juancho, prefiero respuestas cortas" |
+| `app:` | **Todos** los usuarios y todas sus conversaciones | Siempre | `app:avisos`: "hoy no hay pan de queso" |
+| `temp:` | Solo el turno en curso | Se descarta al terminar la respuesta; nunca se guarda | `temp:combo_params` y las demás claves del combo |
+
+```
+app:   ┌──────────────── la cafetería (todos) ────────────────┐
+user:  │ ┌──────── Juan (cajero) ────────┐ ┌── Ana (admin) ──┐ │
+sesión │ │ ┌ conversación 1 ┐ ┌ conv 2 ┐ │ │ ┌ conv 1 ┐      │ │
+temp:  │ │ │ [turno][turno] │ │ [turno]│ │ │ │ [turno]│      │ │
+```
+
+En la cafetería:
+
+- **`user:preferencias`, la memoria del usuario.** Si el usuario dice "recuerda que me llamo Juancho", el coordinador llama a `save_preferences`. En una **conversación nueva** el asistente ya lo sabe: su instrucción lo lee con `{user:preferencias?}`.
+- **`app:avisos`, la memoria de toda la cafetería.** "Avisa a todo el equipo que hoy no hay pan de queso" va al administrador, que llama a `save_notices`. Cualquier usuario, en cualquier conversación, recibe el aviso en la instrucción del coordinador y del barista (`{app:avisos?}`). Como no hay control de roles, cualquiera puede publicar un aviso.
+- Las dos tools **reemplazan el texto completo** (no agregan al final): así el modelo también puede corregir u olvidar algo ("ya no me llames Juancho"). El texto tiene un máximo de 600 caracteres porque va en la instrucción de **cada** llamada al modelo.
+- En la base, el ADK guarda cada alcance en su propia tabla: `user_states` y `app_states` (sin el prefijo), además de `sessions`.
+
+Cuidado al elegir el prefijo: `user:` es de **quien inició sesión**, no del cliente de la cafetería. El cajero atiende a muchos clientes, por eso `customer_name` es de la conversación: con `user:customer_name`, el siguiente cliente heredaría el nombre del anterior.
+
+### ¿Y el servicio de memoria del ADK?
+
+El ADK tiene además un **servicio de memoria** (`memory.Service`, con las tools `load_memory` y `preload_memory`) para **buscar en lo que se habló** en conversaciones anteriores. No es lo mismo que la persistencia:
+
+| | Persistencia (sesiones) | Servicio de memoria |
+|---|---|---|
+| Qué guarda | La conversación completa | Fragmentos que se pueden buscar |
+| Qué ve el modelo | La conversación actual, siempre | Lo que devuelva una búsqueda |
+| Cómo se llena | Sola, en cada evento | Alguien debe llamar a `AddSessionToMemory` (el ADK no lo hace solo) |
+
+No lo usamos porque en Go solo hay dos implementaciones: `memory.InMemoryService`, que vive en la RAM, crece con cada conversación y se vacía al reiniciar, y la de **Vertex AI** (Memory Bank), que exige Google Cloud. Para la cafetería alcanza con el estado `user:` y `app:`: ocupa un tamaño fijo, ya se guarda en SQLite y lo escribe una tool que valida. El servicio de memoria haría falta para preguntas como "¿qué combo me armaste la semana pasada?"; en ese caso habría que implementar `memory.Service` sobre una base de datos, o usar Vertex AI.
 
 ## Si aparece "se alcanzó el límite de peticiones por minuto"
 
@@ -338,7 +383,7 @@ sequenceDiagram
     A-->>U: fragmento HTML con la pregunta y la respuesta
 ```
 
-La sesión se recuerda en la cookie `cafe_chat`. "Nueva conversación" la borra. Si los agentes no reconocen la sesión (por ejemplo, se reiniciaron), la app abre una nueva y reintenta. Por ahora las sesiones viven en memoria: el historial por usuario llega en la fase 7.
+La conversación abierta se recuerda en la cookie `cafe_chat`. "Nueva conversación" la borra, y la lista de conversaciones permite volver a una anterior. Si los agentes no reconocen la sesión, la app abre una nueva y reintenta.
 
 ## Prueba sugerida
 
@@ -359,3 +404,6 @@ En el menú **Asistente**:
 12. `Necesito ayuda, no sé qué hacer` → el texto fijo de ayuda (camino `otro`).
 13. **Memoria**: `Cotízame un combo para 5 personas con 52.000` → arma el combo. Luego `¿y si fueran 6 personas con el mismo presupuesto?` → recuerda los $52.000. Reinicia los agentes, recarga el chat y sigue la conversación: no se pierde nada.
 14. **Datos faltantes**: `Quiero un combo para 5 personas` (sin presupuesto) → te pregunta cuál es tu presupuesto, no lo inventa.
+15. **Lista de conversaciones**: pulsa «Nueva conversación», escribe algo y abre la conversación anterior desde la lista de la izquierda: el chat muestra lo conversado y puedes seguir.
+16. **Memoria del usuario (`user:`)**: `Recuerda que me llamo Juancho y que prefiero respuestas cortas`. Abre una conversación nueva y pregunta `¿cómo me llamo?` → "Juancho". Con otro usuario (por ejemplo, admin) no lo sabe.
+17. **Memoria de la cafetería (`app:`)**: como admin, `Avisa a todo el equipo que hoy no hay pan de queso`. Entra como cajero, en una conversación nueva: `¿hay algún aviso para hoy?` → el aviso. Para quitarlo: `quita el aviso del pan de queso`.

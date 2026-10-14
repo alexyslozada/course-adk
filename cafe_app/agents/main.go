@@ -125,6 +125,17 @@ func main() {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
+	// Memoria entre conversaciones: preferencias del usuario (user:) y avisos para todos (app:).
+	savePreferences, err := preferencesTool()
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	saveNotices, err := noticesTool()
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 
 	// ----------------------------------------------
 	// Barista en modo task
@@ -145,6 +156,8 @@ func main() {
 			Háblale al cliente de tú ("tu pedido", "quieres"). La solicitud que recibes
 			puede venir escrita en tercera persona ("el cliente quiere..."): es una
 			nota interna, nunca se la repitas así al cliente.
+			Avisos de la cafetería para todo el equipo: {app:avisos?}
+			Si un aviso afecta el pedido, menciónalo.
 
 			Pasos:
 			1. Consulta el menú con "list_menu". Nunca inventes productos ni precios.
@@ -226,6 +239,10 @@ func main() {
 			  usa "get_sale".
 			- Para un descuento a una venta usa "approve_discount". El número de venta
 			  y el porcentaje deben venir del usuario; si falta alguno, pregúntalo.
+			- Para publicar, cambiar o quitar un aviso para todo el equipo (por ejemplo,
+			  "avisa que hoy no hay pan de queso") usa "save_notices" con la lista
+			  completa de avisos: los actuales más el nuevo, sin el que pidan quitar.
+			  Avisos actuales: {app:avisos?}
 			- Esas dos tools piden la confirmación de una persona. Mientras esté
 			  pendiente, avísale al usuario que debe aprobar o rechazar y espera.
 			  Nunca digas que se hizo un cambio hasta que la tool lo confirme.
@@ -242,7 +259,7 @@ func main() {
 		// Una tarea no puede transferir la conversación: debe terminar con finish_task.
 		DisallowTransferToParent: true,
 		DisallowTransferToPeers:  true,
-		Tools:                    adminTools,
+		Tools:                    append(adminTools, saveNotices),
 	}
 	administrador, err := llmagent.New(administratorConfig)
 	if err != nil {
@@ -333,6 +350,16 @@ func main() {
 			agente (barista, administrador, reseñas) termina, incluye en tu respuesta
 			el resultado completo.
 
+			Preferencias de este usuario, guardadas en conversaciones anteriores:
+			{user:preferencias?}
+			Respétalas siempre. Si te pide que recuerdes u olvides algo sobre cómo
+			atenderlo ("llámame Juancho", "prefiero respuestas cortas", "olvida
+			eso"), llama a "save_preferences" con la lista completa actualizada: las
+			actuales más la nueva, sin la que pida olvidar. Luego confírmaselo.
+
+			Avisos de la cafetería para todo el equipo: {app:avisos?}
+			Tenlos en cuenta al responder (por ejemplo, si un producto se agotó).
+
 			- Si el cliente quiere pedir algo concreto (bebidas, comida, postres), usa
 			  "barista". Cuando termine, confirma el pedido: número de venta, total en
 			  pesos y resumen. Si el barista devuelve un pending_request, el cliente
@@ -352,7 +379,8 @@ func main() {
 			  no se guardó nada, sin hablar de problemas ni pedirle nada más.
 			- Si piden ver o cambiar el inventario, ver el detalle o el total de una
 			  venta (por ejemplo, "¿en cuánto me quedó la factura?"), o aplicar un
-			  descuento a una venta, usa "administrador". Cuando termine, dile al usuario el resultado.
+			  descuento a una venta, o publicar o quitar un aviso para todo el equipo,
+			  usa "administrador". Cuando termine, dile al usuario el resultado.
 			- Si piden el reporte del día, el resumen del negocio o cómo va el día,
 			  llama a "daily_report" de inmediato y responde solo cuando tengas su
 			  resultado (no avises antes que lo estás preparando). Preséntalo en texto
@@ -368,9 +396,11 @@ func main() {
 			  amabilidad que solo puedes ayudar con la cafetería.
 		`,
 		SubAgents: []agent.Agent{barista, administrador, resenas},
-		Tools:     []tool.Tool{reportTool, flowTool},
+		Tools:     []tool.Tool{reportTool, flowTool, savePreferences},
 		// Guarda la conversación en el estado para que los flujos la reciban.
 		BeforeModelCallbacks: []llmagent.BeforeModelCallback{rememberConversation},
+		// Le pone título a la conversación para la lista de la app.
+		BeforeAgentCallbacks: []agent.BeforeAgentCallback{titleConversation},
 	}
 	coordinator, err := llmagent.New(coordinatorConfig)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -40,18 +41,50 @@ type chatDecision struct {
 	Reply
 }
 
-// assistantPage muestra el chat con la conversación en curso (la de la cookie), guardada por los agentes.
+// assistantView es lo que muestra la página del asistente.
+type assistantView struct {
+	Conversations []Conversation // las conversaciones anteriores del usuario
+	Current       string         // la conversación abierta (la de la cookie)
+	History       []chatExchange
+}
+
+// assistantPage muestra el chat con la conversación en curso (la de la cookie), guardada por los
+// agentes, y la lista de conversaciones del usuario.
 func (a *App) assistantPage(w http.ResponseWriter, r *http.Request) {
-	var history []chatExchange
+	ctx := r.Context()
+	userID := strconv.Itoa(userFrom(ctx).ID)
+	var view assistantView
 	if c, err := r.Cookie(chatCookie); err == nil {
-		userID := strconv.Itoa(userFrom(r.Context()).ID)
-		if h, err := a.agents.History(r.Context(), userID, c.Value); err != nil {
+		view.Current = c.Value
+		if h, err := a.agents.History(ctx, userID, c.Value); err != nil {
 			log.Printf("leyendo la conversación: %v", err)
 		} else {
-			history = h
+			view.History = h
 		}
 	}
-	a.render(w, r, "asistente", "Asistente", history)
+	if list, err := a.agents.Conversations(ctx, userID); err != nil {
+		log.Printf("listando las conversaciones: %v", err)
+	} else {
+		view.Conversations = list
+	}
+	a.render(w, r, "asistente", "Asistente", view)
+}
+
+// assistantOpen abre una conversación anterior: la deja en la cookie y vuelve al chat.
+// Solo se puede abrir una conversación del mismo usuario.
+func (a *App) assistantOpen(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	list, err := a.agents.Conversations(ctx, strconv.Itoa(userFrom(ctx).ID))
+	if err != nil {
+		log.Printf("listando las conversaciones: %v", err)
+		http.Redirect(w, r, "/asistente", http.StatusSeeOther)
+		return
+	}
+	if slices.ContainsFunc(list, func(c Conversation) bool { return c.ID == id }) {
+		http.SetCookie(w, &http.Cookie{Name: chatCookie, Value: id, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	}
+	http.Redirect(w, r, "/asistente", http.StatusSeeOther)
 }
 
 // assistantMessage reenvía el mensaje a los agentes y devuelve la pareja pregunta/respuesta.

@@ -19,28 +19,33 @@ const maxTranscriptLines = 24
 // conversationKey es la clave del estado donde se guarda la conversación para los flujos.
 const conversationKey = "conversation"
 
+// textOf junta los textos de un mensaje: no las llamadas a tools ni los pensamientos del modelo.
+func textOf(content *genai.Content) string {
+	if content == nil {
+		return ""
+	}
+	var text strings.Builder
+	for _, part := range content.Parts {
+		if part != nil && part.Text != "" && !part.Thought {
+			text.WriteString(part.Text)
+		}
+	}
+	return strings.TrimSpace(text.String())
+}
+
 // transcript resume la conversación en líneas "Cliente: ..." y "Asistente: ...".
-// Solo cuenta los textos: no las llamadas a tools ni los pensamientos del modelo.
 func transcript(contents []*genai.Content) string {
 	var lines []string
 	for _, content := range contents {
-		if content == nil {
-			continue
-		}
-		var text strings.Builder
-		for _, part := range content.Parts {
-			if part != nil && part.Text != "" && !part.Thought {
-				text.WriteString(part.Text)
-			}
-		}
-		if text.Len() == 0 {
+		text := textOf(content)
+		if text == "" {
 			continue
 		}
 		switch content.Role {
 		case genai.RoleUser:
-			lines = append(lines, "Cliente: "+strings.TrimSpace(text.String()))
+			lines = append(lines, "Cliente: "+text)
 		case genai.RoleModel:
-			lines = append(lines, "Asistente: "+strings.TrimSpace(text.String()))
+			lines = append(lines, "Asistente: "+text)
 		}
 	}
 	if len(lines) > maxTranscriptLines {
@@ -93,16 +98,8 @@ func runAgent(ctx agent.Context, a agent.Agent, input string) (string, error) {
 		if event.ErrorCode != "" || event.ErrorMessage != "" {
 			return "", fmt.Errorf("el flujo %s falló: %s %s", a.Name(), event.ErrorCode, event.ErrorMessage)
 		}
-		if content := event.LLMResponse.Content; content != nil && !event.Partial {
-			var text strings.Builder
-			for _, part := range content.Parts {
-				if part != nil && part.Text != "" && !part.Thought {
-					text.WriteString(part.Text)
-				}
-			}
-			if text.Len() > 0 {
-				last = text.String()
-			}
+		if text := textOf(event.LLMResponse.Content); text != "" && !event.Partial {
+			last = text
 		}
 	}
 	return last, nil

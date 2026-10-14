@@ -89,6 +89,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /asistente/mensaje", a.requireWeb(a.assistantMessage))
 	mux.HandleFunc("POST /asistente/confirmar", a.requireWeb(a.assistantConfirm))
 	mux.HandleFunc("POST /asistente/nueva", a.requireWeb(a.assistantReset))
+	mux.HandleFunc("POST /asistente/abrir/{id}", a.requireWeb(a.assistantOpen))
 
 	a.registerAPI(mux)
 	return mux

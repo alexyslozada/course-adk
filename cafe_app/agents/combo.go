@@ -60,11 +60,13 @@ type comboPlan struct {
 	Total int         `json:"total"`
 }
 
-// Claves del estado. Llevan el id de la invocación para no confundir este combo con el de una
-// petición anterior de la misma sesión.
-func comboParamsKey(ctx agent.Context) string { return "combo_params:" + ctx.InvocationID() }
-func comboBaseKey(ctx agent.Context) string   { return "combo_base:" + ctx.InvocationID() }
-func upsellCheckKey(ctx agent.Context) string { return "upsell_check:" + ctx.InvocationID() }
+// Claves del estado con el prefijo temp: solo sirven mientras se arma este combo. El ADK las
+// descarta al terminar el turno, así que nunca se confunden con las de un combo anterior.
+const (
+	comboParamsKey = "temp:combo_params"
+	comboBaseKey   = "temp:combo_base"
+	upsellCheckKey = "temp:upsell_check"
+)
 
 func setJSON(ctx agent.Context, key string, v any) error {
 	raw, err := json.Marshal(v)
@@ -203,10 +205,10 @@ func (c combos) Build(ctx agent.Context, input any, emit func(*session.Event) er
 			pesos(p.Budget), p.People, describe(base), pesos(base.Total), pesos(base.Total-p.Budget)))
 	}
 
-	if err := setJSON(ctx, comboParamsKey(ctx), p); err != nil {
+	if err := setJSON(ctx, comboParamsKey, p); err != nil {
 		return "", err
 	}
-	if err := setJSON(ctx, comboBaseKey(ctx), base); err != nil {
+	if err := setJSON(ctx, comboBaseKey, base); err != nil {
 		return "", err
 	}
 
@@ -251,7 +253,7 @@ type CheckUpsellResponse struct {
 func (c combos) CheckUpsell(ctx agent.Context, req CheckUpsellRequest) (CheckUpsellResponse, error) {
 	var p comboParams
 	var base comboPlan
-	if getJSON(ctx, comboParamsKey(ctx), &p) != nil || getJSON(ctx, comboBaseKey(ctx), &base) != nil {
+	if getJSON(ctx, comboParamsKey, &p) != nil || getJSON(ctx, comboBaseKey, &base) != nil {
 		return CheckUpsellResponse{}, fmt.Errorf("no hay un combo base para mejorar")
 	}
 	products, stock, err := c.catalog(ctx)
@@ -301,7 +303,7 @@ func (c combos) CheckUpsell(ctx agent.Context, req CheckUpsellRequest) (CheckUps
 	response.Extra = response.Total - base.Total
 	response.Approved = len(response.Problems) == 0
 
-	if err := setJSON(ctx, upsellCheckKey(ctx), response); err != nil {
+	if err := setJSON(ctx, upsellCheckKey, response); err != nil {
 		return CheckUpsellResponse{}, err
 	}
 	// La salida del bucle la decide el código: si la mejora cumple, Escalate lo detiene.
@@ -317,12 +319,12 @@ func (c combos) CheckUpsell(ctx agent.Context, req CheckUpsellRequest) (CheckUps
 func comboResult(ctx agent.Context, _ any, emit func(*session.Event) error) (string, error) {
 	var p comboParams
 	var base comboPlan
-	if getJSON(ctx, comboParamsKey(ctx), &p) != nil || getJSON(ctx, comboBaseKey(ctx), &base) != nil {
+	if getJSON(ctx, comboParamsKey, &p) != nil || getJSON(ctx, comboBaseKey, &base) != nil {
 		return say(ctx, emit, "No pude armar el combo. Cuéntame de nuevo para cuántas personas es y tu presupuesto.")
 	}
 	msg := baseMessage(p, base)
 	var upsell CheckUpsellResponse
-	if getJSON(ctx, upsellCheckKey(ctx), &upsell) == nil && upsell.Approved {
+	if getJSON(ctx, upsellCheckKey, &upsell) == nil && upsell.Approved {
 		msg += fmt.Sprintf("\n\nSi quieres algo mejor, por %s más (total %s):\n%s\n¿Cuál prefieres?",
 			pesos(upsell.Extra), pesos(upsell.Total), strings.TrimSuffix(describe(comboPlan{Lines: upsell.Lines}), "\n"))
 	} else {

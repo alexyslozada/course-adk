@@ -198,6 +198,51 @@ func summarize(events []adkEvent) Reply {
 	return reply
 }
 
+// Conversation es una conversación guardada del usuario, para listarla.
+type Conversation struct {
+	ID      string
+	Title   string
+	Updated time.Time
+}
+
+// Conversations lista las conversaciones del usuario, de la más reciente a la más antigua. El
+// título lo guarda el coordinador en el estado de cada sesión; las que no tienen ningún mensaje
+// no se listan.
+func (c *agentsClient) Conversations(ctx context.Context, userID string) ([]Conversation, error) {
+	path := fmt.Sprintf("%s/apps/%s/users/%s/sessions", c.baseURL, agentsAppName, url.PathEscape(userID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("no se pudo conectar con los agentes: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("los agentes respondieron %d al listar las conversaciones", resp.StatusCode)
+	}
+	var sessions []struct {
+		ID             string         `json:"id"`
+		LastUpdateTime int64          `json:"lastUpdateTime"`
+		State          map[string]any `json:"state"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&sessions); err != nil {
+		return nil, fmt.Errorf("respuesta inesperada de los agentes: %w", err)
+	}
+
+	var out []Conversation
+	for _, s := range sessions {
+		title, _ := s.State["title"].(string)
+		if title == "" {
+			continue
+		}
+		out = append(out, Conversation{ID: s.ID, Title: title, Updated: time.Unix(s.LastUpdateTime, 0)})
+	}
+	slices.SortFunc(out, func(a, b Conversation) int { return b.Updated.Compare(a.Updated) })
+	return out, nil
+}
+
 // History devuelve la conversación guardada de una sesión, como pares pregunta/respuesta.
 // Una sesión que los agentes no conocen da una conversación vacía.
 func (c *agentsClient) History(ctx context.Context, userID, sessionID string) ([]chatExchange, error) {
