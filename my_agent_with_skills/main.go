@@ -10,9 +10,6 @@ import (
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
-	"google.golang.org/adk/v2/tool"
-	"google.golang.org/adk/v2/tool/skilltoolset"
-	"google.golang.org/adk/v2/tool/skilltoolset/skill"
 	"google.golang.org/genai"
 )
 
@@ -41,28 +38,13 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Skills desde el sistema de archivos
-	// Cada subdirectorio de ./skills con un SKILL.md es un skill
-	// ----------------------------------------------
-	source := skill.NewFileSystemSource(os.DirFS("./skills"))
-
-	skillToolset, err := skilltoolset.New(ctx, skilltoolset.Config{
-		Source: source,
-	})
-	if err != nil {
-		fmt.Println("Error al crear el skill toolset:", err)
-		os.Exit(1)
-	}
-
-	// ----------------------------------------------
 	// Creación del agente
 	// ----------------------------------------------
 	agentConfig := llmagent.Config{
-		Name:        "skills_agent",
+		Name:        "generic-agent",
 		Model:       model,
-		Description: "Asistente que usa skills especializados",
-		Instruction: "Eres un asistente útil que aprovecha los skills disponibles para responder.",
-		Toolsets:    []tool.Toolset{skillToolset},
+		Description: "Es un ayudante genérico",
+		Instruction: "Ayudas a los usuarios a responder preguntas generales",
 	}
 
 	a, err := llmagent.New(agentConfig)
@@ -70,6 +52,7 @@ func main() {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
+
 
 	// ----------------------------------------------
 	// Lanzar el agente

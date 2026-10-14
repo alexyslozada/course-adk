@@ -7,7 +7,6 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
-	"google.golang.org/adk/v2/agent/workflowagents/loopagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
@@ -118,34 +117,17 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Workflow en bucle
-	// Repite combo_planner → cashier hasta que check_combo detenga el bucle
-	// (combo dentro del presupuesto) o hasta llegar a MaxIterations.
+	// Lanzar el agente
+	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
 	// ----------------------------------------------
-	comboLoopAgentConfig := agent.Config{
-		Name:        "combo_loop",
-		Description: "Arma un combo y lo ajusta hasta que cumpla el presupuesto del cliente.",
-		SubAgents: []agent.Agent{
-			comboPlanner,
-			cashier,
-		},
-	}
-	comboLoopConfig := loopagent.Config{
-		AgentConfig: comboLoopAgentConfig,
-		// Límite de seguridad para que el bucle no corra para siempre
-		MaxIterations: 4,
-	}
-	comboLoop, err := loopagent.New(comboLoopConfig)
+	loader, err := agent.NewMultiLoader(comboPlanner, cashier)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
-	// ----------------------------------------------
-	// Lanzar el agente
-	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: agent.NewSingleLoader(comboLoop),
+		AgentLoader: loader,
 	}
 
 	launch := full.NewLauncher()

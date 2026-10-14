@@ -7,8 +7,6 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
-	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
-	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
@@ -99,27 +97,6 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Workflow paralelo
-	// Ejecuta los tres especialistas al mismo tiempo. Cada uno trabaja aislado
-	// y no ve lo que hacen los otros mientras corre.
-	// ----------------------------------------------
-	drinkAnalysisAgentConfig := agent.Config{
-		Name:        "drink_analysis",
-		Description: "Analiza una bebida nueva desde tres áreas al mismo tiempo.",
-		SubAgents: []agent.Agent{
-			allergenChecker,
-			priceEstimator,
-			sloganWriter,
-		},
-	}
-	drinkAnalysisConfig := parallelagent.Config{AgentConfig: drinkAnalysisAgentConfig}
-	drinkAnalysis, err := parallelagent.New(drinkAnalysisConfig)
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-
-	// ----------------------------------------------
 	// Agente que une los resultados
 	// Lee las tres claves que dejaron los especialistas en el estado.
 	// ----------------------------------------------
@@ -143,29 +120,17 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Workflow secuencial que envuelve al paralelo
-	// Primero el análisis en paralelo y, cuando terminan los tres, la ficha.
+	// Lanzar el agente
+	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
 	// ----------------------------------------------
-	launchPipelineAgentConfig := agent.Config{
-		Name:        "launch_pipeline",
-		Description: "Analiza una bebida nueva y arma su ficha de lanzamiento.",
-		SubAgents: []agent.Agent{
-			drinkAnalysis,
-			launchSheetWriter,
-		},
-	}
-	launchPipelineConfig := sequentialagent.Config{AgentConfig: launchPipelineAgentConfig}
-	launchPipeline, err := sequentialagent.New(launchPipelineConfig)
+	loader, err := agent.NewMultiLoader(allergenChecker, priceEstimator, sloganWriter, launchSheetWriter)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
-	// ----------------------------------------------
-	// Lanzar el agente
-	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: agent.NewSingleLoader(launchPipeline),
+		AgentLoader: loader,
 	}
 
 	launch := full.NewLauncher()

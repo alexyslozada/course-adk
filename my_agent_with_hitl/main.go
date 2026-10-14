@@ -40,14 +40,11 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Tool con confirmación humana (Human in the Loop)
+	// Convertir la función en una function tool
 	// ----------------------------------------------
 	applyCouponToolConfig := functiontool.Config{
 		Name:        "apply_coupon",
 		Description: "Aplica un cupón de descuento a un producto y devuelve el precio final.",
-		// Antes de ejecutar la tool, el ADK llama a esta función con los mismos
-		// argumentos. Si devuelve true, el agente se detiene y pide confirmación.
-		RequireConfirmationProvider: RequiresConfirmation,
 	}
 	applyCouponTool, err := functiontool.New(applyCouponToolConfig, ApplyCoupon)
 	if err != nil {
@@ -66,8 +63,6 @@ func main() {
 			Eres el asistente de una tienda. Cuando el usuario quiera aplicar un cupón
 			a un producto, usa la herramienta "apply_coupon" y respóndele con el precio
 			original, el descuento y el precio final.
-			Si la aplicación del cupón es rechazada, infórmale al usuario que el cupón
-			no fue aplicado.
 		`,
 		Tools: []tool.Tool{
 			applyCouponTool,

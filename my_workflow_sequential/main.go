@@ -7,7 +7,6 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
-	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
@@ -105,31 +104,17 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Workflow secuencial
-	// No hay un LLM que decida: el código ejecuta los sub-agentes siempre en
-	// este orden, uno después del otro.
+	// Lanzar el agente
+	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
 	// ----------------------------------------------
-	pipelineAgentConfig := agent.Config{
-		Name:        "invoice_pipeline",
-		Description: "Lee una factura, agrupa sus ítems por categoría y presenta el reporte.",
-		SubAgents: []agent.Agent{
-			invoiceReader,
-			itemCategorizer,
-			reportWriter,
-		},
-	}
-	pipelineConfig := sequentialagent.Config{AgentConfig: pipelineAgentConfig}
-	pipeline, err := sequentialagent.New(pipelineConfig)
+	loader, err := agent.NewMultiLoader(invoiceReader, itemCategorizer, reportWriter)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
-	// ----------------------------------------------
-	// Lanzar el agente
-	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: agent.NewSingleLoader(pipeline),
+		AgentLoader: loader,
 	}
 
 	launch := full.NewLauncher()

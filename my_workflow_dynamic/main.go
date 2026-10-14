@@ -7,11 +7,9 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
-	"google.golang.org/adk/v2/agent/workflowagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
-	"google.golang.org/adk/v2/workflow"
 	"google.golang.org/genai"
 )
 
@@ -75,48 +73,17 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Nodos
-	// El parser y el barista no se conectan con aristas:
-	// el nodo dinámico los llama desde código Go con workflow.RunNode
-	// ----------------------------------------------
-	parserNode, err := workflow.NewAgentNode(orderParser, workflow.NodeConfig{})
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-	baristaNode, err := workflow.NewAgentNode(barista, workflow.NodeConfig{})
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-
-	orderWorkflowNode := NewOrderWorkflow(parserNode, baristaNode)
-
-	// ----------------------------------------------
-	// Workflow dinámico
-	// Solo hay una arista: Start → order_workflow. Todo lo demás
-	// ocurre dentro del código Go del nodo dinámico.
-	// ----------------------------------------------
-	orderAgentConfig := workflowagent.Config{
-		Name:        "order_dynamic",
-		Description: "Prepara un pedido con cualquier cantidad de bebidas.",
-		Edges:       workflow.Chain(workflow.Start, orderWorkflowNode),
-		SubAgents: []agent.Agent{
-			orderParser,
-			barista,
-		},
-	}
-	orderAgent, err := workflowagent.New(orderAgentConfig)
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-
-	// ----------------------------------------------
 	// Lanzar el agente
+	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
 	// ----------------------------------------------
+	loader, err := agent.NewMultiLoader(orderParser, barista)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
 	launcherConfig := launcher.Config{
-		AgentLoader: agent.NewSingleLoader(orderAgent),
+		AgentLoader: loader,
 	}
 
 	launch := full.NewLauncher()

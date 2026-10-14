@@ -10,8 +10,6 @@ import (
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
-	"google.golang.org/adk/v2/tool"
-	"google.golang.org/adk/v2/tool/geminitool"
 	"google.golang.org/genai"
 )
 
@@ -43,13 +41,10 @@ func main() {
 	// Creación del agente
 	// ----------------------------------------------
 	agentConfig := llmagent.Config{
-		Name:        "research_agent",
+		Name:        "generic-agent",
 		Model:       model,
-		Description: "Ayudas al usuario a buscar datos en internet",
-		Instruction: "Eres un asistente útil que le permite buscar en internet las consultas que hace el usuario",
-		Tools: []tool.Tool{
-			geminitool.GoogleSearch{},
-		},
+		Description: "Es un ayudante genérico",
+		Instruction: "Ayudas a los usuarios a responder preguntas generales",
 	}
 
 	a, err := llmagent.New(agentConfig)
@@ -57,6 +52,7 @@ func main() {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
+
 
 	// ----------------------------------------------
 	// Lanzar el agente
