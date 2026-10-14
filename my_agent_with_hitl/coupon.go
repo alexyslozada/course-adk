@@ -32,6 +32,9 @@ var coupons = map[string]int{
 	"ESPECIAL-50":   50,
 }
 
+// Los cupones con un descuento mayor a este umbral requieren confirmación humana
+const confirmationThreshold = 20
+
 func ApplyCoupon(ctx agent.Context, req ApplyCouponRequest) (ApplyCouponResponse, error) {
 	price, isFound := products[strings.ToLower(req.Product)]
 	if !isFound {
@@ -50,4 +53,10 @@ func ApplyCoupon(ctx agent.Context, req ApplyCouponRequest) (ApplyCouponResponse
 		Price:    price,
 		Final:    price * float64(100-discount) / 100,
 	}, nil
+}
+
+// RequiresConfirmation decide, antes de ejecutar la tool, si se le debe pedir
+// confirmación al usuario: solo cuando el cupón supera el umbral de descuento.
+func RequiresConfirmation(req ApplyCouponRequest) bool {
+	return coupons[strings.ToUpper(req.Coupon)] > confirmationThreshold
 }
