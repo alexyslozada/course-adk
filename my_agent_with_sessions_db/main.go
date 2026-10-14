@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/glebarez/sqlite"
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
-	"google.golang.org/adk/v2/session"
+	"google.golang.org/adk/v2/session/database"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/genai"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -83,13 +86,31 @@ func main() {
 	}
 
 	// ----------------------------------------------
+	// Servicio de sesiones en base de datos (SQLite)
+	// Las sesiones y su estado se guardan en el archivo sessions.db,
+	// así que sobreviven a un reinicio del servidor.
+	// ----------------------------------------------
+	// El logger en modo silencioso evita que GORM imprima cada consulta SQL
+	gormConfig := &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}
+	sessionService, err := database.NewSessionService(sqlite.Open("sessions.db"), gormConfig)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
+	// Crea las tablas que necesita el ADK si todavía no existen
+	err = database.AutoMigrate(sessionService)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
+	// ----------------------------------------------
 	// Lanzar el agente
 	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: agent.NewSingleLoader(a),
-		// Servicio que guarda las sesiones y su estado. En memoria se pierde
-		// todo al reiniciar el servidor.
-		SessionService: session.InMemoryService(),
+		AgentLoader:    agent.NewSingleLoader(a),
+		SessionService: sessionService,
 	}
 
 	launch := full.NewLauncher()
