@@ -38,13 +38,21 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Creación del agente
+	// Creación del agente con salida estructurada
 	// ----------------------------------------------
 	agentConfig := llmagent.Config{
-		Name:        "generic-agent",
+		Name:        "review_agent",
 		Model:       model,
-		Description: "Es un ayudante genérico",
-		Instruction: "Ayudas a los usuarios a responder preguntas generales",
+		Description: "Clasificas las reseñas que dejan los clientes de una cafetería",
+		Instruction: `
+			Eres el analista de reseñas de una cafetería. El usuario te enviará la
+			reseña de un cliente y debes clasificarla.
+		`,
+		// El modelo siempre responde un JSON que cumple este esquema
+		OutputSchema: &reviewSchema,
+		// La respuesta del agente se guarda en el estado de la sesión con esta
+		// clave. Otro agente o tool podría leerla después como {review}.
+		OutputKey: "review",
 	}
 
 	a, err := llmagent.New(agentConfig)
@@ -52,7 +60,6 @@ func main() {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-
 
 	// ----------------------------------------------
 	// Lanzar el agente
