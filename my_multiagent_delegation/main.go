@@ -77,17 +77,38 @@ func main() {
 	}
 
 	// ----------------------------------------------
-	// Lanzar el agente
-	// Por ahora los agentes van sueltos: en la web eliges con cuál hablar.
+	// Agente coordinador
+	// Con SubAgents, el ADK le agrega la tool transfer_to_agent y el LLM
+	// decide a qué sub-agente pasarle la conversación.
 	// ----------------------------------------------
-	loader, err := agent.NewMultiLoader(barista, reviewAgent)
+	coordinatorConfig := llmagent.Config{
+		Name:        "coffee_host",
+		Model:       model,
+		Description: "Recibe a los clientes de la cafetería y los dirige al área correcta.",
+		Instruction: `
+			Eres el anfitrión de una cafetería. Saluda al cliente y, según lo que
+			necesite, pásale la conversación al agente adecuado:
+			- Si quiere pedir una bebida, al "barista".
+			- Si quiere dar una opinión o poner una queja, al "review_agent".
+			No respondas tú mismo esas solicitudes.
+		`,
+		SubAgents: []agent.Agent{
+			barista,
+			reviewAgent,
+		},
+	}
+	coordinator, err := llmagent.New(coordinatorConfig)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
+	// ----------------------------------------------
+	// Lanzar el agente
+	// Se lanza solo el coordinador: los sub-agentes viven dentro de él.
+	// ----------------------------------------------
 	launcherConfig := launcher.Config{
-		AgentLoader: loader,
+		AgentLoader: agent.NewSingleLoader(coordinator),
 	}
 
 	launch := full.NewLauncher()
