@@ -26,6 +26,11 @@ type sale struct {
 	Customer        string `json:"customer"`
 	Total           int    `json:"total"`
 	DiscountPercent int    `json:"discount_percent"`
+	Items           []struct {
+		Name      string `json:"name"`
+		Quantity  int    `json:"quantity"`
+		UnitPrice int    `json:"unit_price"`
+	} `json:"items"`
 }
 
 type admin struct {
@@ -48,6 +53,36 @@ func (a admin) GetInventory(ctx agent.Context, _ GetInventoryRequest) (GetInvent
 		return GetInventoryResponse{}, err
 	}
 	return GetInventoryResponse{Items: items}, nil
+}
+
+// ----------------------------------------------
+// get_sale: solo lee, no pide confirmación
+// ----------------------------------------------
+
+type GetSaleRequest struct {
+	SaleID int `json:"sale_id" jsonschema:"número de la venta"`
+}
+
+type GetSaleResponse struct {
+	SaleID          int      `json:"sale_id"`
+	Customer        string   `json:"customer"`
+	Items           []string `json:"items"`
+	Subtotal        int      `json:"subtotal" jsonschema:"suma de los productos, antes del descuento"`
+	DiscountPercent int      `json:"discount_percent"`
+	Total           int      `json:"total" jsonschema:"lo que debe pagar el cliente, con el descuento ya aplicado"`
+}
+
+func (a admin) GetSale(ctx agent.Context, req GetSaleRequest) (GetSaleResponse, error) {
+	var s sale
+	if err := a.app.Do(ctx, "GET", fmt.Sprintf("/api/sales/%d", req.SaleID), nil, &s); err != nil {
+		return GetSaleResponse{}, err
+	}
+	response := GetSaleResponse{SaleID: s.ID, Customer: customerName(s), DiscountPercent: s.DiscountPercent, Total: s.Total, Items: []string{}}
+	for _, it := range s.Items {
+		response.Items = append(response.Items, fmt.Sprintf("%d x %s", it.Quantity, it.Name))
+		response.Subtotal += it.Quantity * it.UnitPrice
+	}
+	return response, nil
 }
 
 // ----------------------------------------------
@@ -210,6 +245,13 @@ func (a admin) tools() ([]tool.Tool, error) {
 	if err != nil {
 		return nil, err
 	}
+	getSale, err := functiontool.New(functiontool.Config{
+		Name:        "get_sale",
+		Description: "Consulta una venta: sus productos, el subtotal, el descuento aplicado y el total que debe pagar el cliente.",
+	}, a.GetSale)
+	if err != nil {
+		return nil, err
+	}
 	adjustInventory, err := functiontool.New(functiontool.Config{
 		Name:        "adjust_inventory",
 		Description: "Cambia la cantidad de un producto en el inventario. Pide la confirmación del administrador antes de aplicar el cambio.",
@@ -224,5 +266,5 @@ func (a admin) tools() ([]tool.Tool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []tool.Tool{getInventory, adjustInventory, approveDiscount}, nil
+	return []tool.Tool{getInventory, getSale, adjustInventory, approveDiscount}, nil
 }

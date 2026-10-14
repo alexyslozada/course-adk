@@ -136,52 +136,123 @@ func (c *agentsClient) run(ctx context.Context, userID, sessionID string, part m
 	return parseReply(data)
 }
 
+// adkEvent es un evento de la conversación, como lo devuelve la API del ADK.
+type adkEvent struct {
+	Content *struct {
+		Role  string `json:"role"`
+		Parts []struct {
+			Text         string `json:"text"`
+			Thought      bool   `json:"thought"`
+			FunctionCall *struct {
+				ID   string         `json:"id"`
+				Name string         `json:"name"`
+				Args map[string]any `json:"args"`
+			} `json:"functionCall"`
+			FunctionResponse *struct {
+				ID string `json:"id"`
+			} `json:"functionResponse"`
+		} `json:"parts"`
+	} `json:"content"`
+}
+
 func parseReply(data []byte) (Reply, error) {
-	var events []struct {
-		Content *struct {
-			Role  string `json:"role"`
-			Parts []struct {
-				Text         string `json:"text"`
-				Thought      bool   `json:"thought"`
-				FunctionCall *struct {
-					ID   string         `json:"id"`
-					Name string         `json:"name"`
-					Args map[string]any `json:"args"`
-				} `json:"functionCall"`
-				FunctionResponse *struct {
-					ID string `json:"id"`
-				} `json:"functionResponse"`
-			} `json:"parts"`
-		} `json:"content"`
-	}
+	var events []adkEvent
 	if err := json.Unmarshal(data, &events); err != nil {
 		return Reply{}, fmt.Errorf("respuesta inesperada de los agentes: %w", err)
 	}
+	return summarize(events), nil
+}
 
-	var texts []string
+// summarize toma la respuesta final del turno y la confirmación que haya quedado pendiente (una que
+// ya tiene respuesta deja de estarlo).
+//
+// Solo se muestra el ÚLTIMO mensaje del modelo: en un turno hablan varios agentes (por ejemplo, el de
+// reseñas dice "quedó guardada" y luego el coordinador lo confirma), y mostrarlos todos repetía la
+// misma respuesta. Pedirle al coordinador "no repitas" no bastó; esto sí lo garantiza.
+func summarize(events []adkEvent) Reply {
+	var last string
 	var pending []*Confirmation
 	for _, e := range events {
 		if e.Content == nil {
 			continue
 		}
+		var text []string
 		for _, p := range e.Content.Parts {
 			switch {
 			case p.FunctionCall != nil && p.FunctionCall.Name == "adk_request_confirmation":
 				pending = append(pending, confirmationFrom(p.FunctionCall.ID, p.FunctionCall.Args))
 			case p.FunctionResponse != nil:
-				// una confirmación que ya tiene respuesta deja de estar pendiente
 				pending = slices.DeleteFunc(pending, func(c *Confirmation) bool { return c.CallID == p.FunctionResponse.ID })
 			case p.Text != "" && !p.Thought && e.Content.Role == "model":
-				// se juntan los textos del modelo en orden (sin los pensamientos internos)
-				texts = append(texts, p.Text)
+				text = append(text, p.Text)
 			}
 		}
+		if len(text) > 0 {
+			last = strings.Join(text, "")
+		}
 	}
-	reply := Reply{Text: strings.Join(texts, "\n\n")}
+	reply := Reply{Text: strings.TrimSpace(last)}
 	if len(pending) > 0 {
 		reply.Confirmation = pending[len(pending)-1]
 	}
-	return reply, nil
+	return reply
+}
+
+// History devuelve la conversación guardada de una sesión, como pares pregunta/respuesta.
+// Una sesión que los agentes no conocen da una conversación vacía.
+func (c *agentsClient) History(ctx context.Context, userID, sessionID string) ([]chatExchange, error) {
+	path := fmt.Sprintf("%s/apps/%s/users/%s/sessions/%s", c.baseURL, agentsAppName, url.PathEscape(userID), url.PathEscape(sessionID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("no se pudo conectar con los agentes: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("los agentes respondieron %d al pedir la conversación", resp.StatusCode)
+	}
+	var session struct {
+		Events []adkEvent `json:"events"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&session); err != nil {
+		return nil, fmt.Errorf("respuesta inesperada de los agentes: %w", err)
+	}
+
+	// cada mensaje de texto del usuario abre un intercambio; lo que sigue es la respuesta
+	var exchanges []chatExchange
+	var group []adkEvent
+	question := ""
+	flush := func() {
+		if question != "" {
+			exchanges = append(exchanges, chatExchange{Question: question, Reply: summarize(group)})
+		}
+	}
+	for _, e := range session.Events {
+		if e.Content != nil && e.Content.Role == "user" {
+			var text strings.Builder
+			for _, p := range e.Content.Parts {
+				text.WriteString(p.Text)
+			}
+			if text.Len() > 0 {
+				flush()
+				question, group = strings.TrimSpace(text.String()), nil
+				continue
+			}
+		}
+		group = append(group, e)
+	}
+	flush()
+	// Una tarjeta vieja ya no es accionable: el agente siguió con otra. Solo queda la última.
+	for i := range exchanges[:max(len(exchanges)-1, 0)] {
+		exchanges[i].Confirmation = nil
+	}
+	return exchanges, nil
 }
 
 // confirmationFrom lee los argumentos de adk_request_confirmation: la pista para la
