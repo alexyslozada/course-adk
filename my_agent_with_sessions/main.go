@@ -10,6 +10,7 @@ import (
 	"google.golang.org/adk/v2/cmd/launcher"
 	"google.golang.org/adk/v2/cmd/launcher/full"
 	"google.golang.org/adk/v2/model/gemini"
+	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/genai"
@@ -59,9 +60,16 @@ func main() {
 		Name:        "coffee_agent",
 		Model:       model,
 		Description: "Atiendes a los clientes de una cafetería y recuerdas su bebida favorita",
+		// {user:favorite_drink?} se reemplaza con el valor guardado en el estado.
+		// El "?" evita un error cuando la clave todavía no existe.
 		Instruction: `
 			Eres el barista de una cafetería. Cuando el cliente te diga cuál es su
 			bebida favorita, guárdala con la herramienta "save_favorite_drink".
+
+			La bebida favorita del cliente es: {user:favorite_drink?}
+
+			Si el cliente pide "lo de siempre", prepárale su bebida favorita.
+			Si no conoces su bebida favorita, pregúntale cuál es.
 		`,
 		Tools: []tool.Tool{
 			saveFavoriteDrinkTool,
@@ -79,6 +87,9 @@ func main() {
 	// ----------------------------------------------
 	launcherConfig := launcher.Config{
 		AgentLoader: agent.NewSingleLoader(a),
+		// Servicio que guarda las sesiones y su estado. En memoria se pierde
+		// todo al reiniciar el servidor.
+		SessionService: session.InMemoryService(),
 	}
 
 	launch := full.NewLauncher()
