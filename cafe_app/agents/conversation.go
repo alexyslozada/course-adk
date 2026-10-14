@@ -93,10 +93,10 @@ func runAgent(ctx agent.Context, a agent.Agent, input string) (string, error) {
 	events := r.Run(ctx, ctx.UserID(), created.Session.ID(), genai.NewContentFromText(input, genai.RoleUser), agent.RunConfig{})
 	for event, err := range events {
 		if err != nil {
-			return "", fmt.Errorf("el flujo %s falló: %w", a.Name(), err)
+			return "", fmt.Errorf("el agente %s falló: %w", a.Name(), err)
 		}
 		if event.ErrorCode != "" || event.ErrorMessage != "" {
-			return "", fmt.Errorf("el flujo %s falló: %s %s", a.Name(), event.ErrorCode, event.ErrorMessage)
+			return "", fmt.Errorf("el agente %s falló: %s %s", a.Name(), event.ErrorCode, event.ErrorMessage)
 		}
 		if text := textOf(event.LLMResponse.Content); text != "" && !event.Partial {
 			last = text

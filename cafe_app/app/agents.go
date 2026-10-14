@@ -92,7 +92,7 @@ type ConfirmationField struct {
 	Numeric bool
 }
 
-var fieldLabels = map[string]string{"percent": "Porcentaje de descuento"}
+var fieldLabels = map[string]string{"percent": "Porcentaje de descuento", "quantity": "Cantidad"}
 
 // Send envía el mensaje del usuario y devuelve lo que respondieron los agentes.
 func (c *agentsClient) Send(ctx context.Context, userID, sessionID, text string) (Reply, error) {
